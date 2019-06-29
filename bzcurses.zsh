@@ -1332,9 +1332,9 @@ trap 'exit_trap; return $?'    EXIT
 #   |___/                                    |___/
 _calculate_terminal_space() {
 	if [[ $LINES -lt 24 || $COLUMNS -lt 80 ]]; then
-		echo "ERROR, your terminal is to small."
-		echo "Expected at least 80x24, got: ${COLUMNS}x${LINES}"
-		exit 1
+		echo "ERROR, your terminal is to small." 1>&2
+		echo "Expected at least 80x24, got: ${COLUMNS}x${LINES}" 1>&2
+		false # trigger ERR trap
 	fi
 
 	typeset -g LAST_LINES=$LINES
@@ -1350,10 +1350,9 @@ _calculate_terminal_space() {
 			height=$(( $LINES -20 ))
 		fi
 		if [ $(( $LINES - $height )) -lt 4 ]; then
-			zcurses end
-			echo "ERROR, your terminal is to small for debug mode."
-			echo "Expected at least 80x24+4, got: ${COLUMNS}x${LINES}"
-			exit 1
+			echo "ERROR, your terminal is to small for debug mode." 1>&2
+			echo "Expected at least 80x24+4, got: ${COLUMNS}x${LINES}" 1>&2
+			false # trigger ERR trap
 		fi
 	fi
 }
