@@ -1,6 +1,5 @@
 #!/usr/bin/env zsh
 debug=${debug:-false}
-#unsetopt ERR_RETURN
 
 #       _      _
 #   ___| |_ __| |___  ___ _ __
@@ -16,11 +15,6 @@ title_stdscr="bzcurses example"
 #  |_| |_| |_|\__,_|_|_| |_| |_| |_| |_|\___|_| |_|\__,_|
 
 main_choices_title="Main Menu"
-
-main_choices_buttons_actions.exit() {
-	_draw_yesno "Exit" "Do you really want to exit" && return 1 || :
-}
-
 
 # main menu intro text (max 4 rows)
 main_choices_intro_text="${$(cat <<EOF
@@ -47,12 +41,15 @@ typeset -A main_choice_actions=(
 )
 
 # overwrite the default button definitions
+# button broken is an example for what will happen
+# when you forget to define a function for a button
 typeset -A main_choices_buttons=(
 	ok     "[SELECT]"
 	exit   "[EXIT]"
 	help   "[HELP]"
+	broken "[BROKEN]"
 )
-main_choices_buttons_order=( "ok" "exit" "help" )
+main_choices_buttons_order=( "ok" "exit" "help" "broken" )
 main_choices_buttons_active=1
 
 
@@ -145,9 +142,7 @@ blah_checkboxes_buttons_active=1
 
 # draw the choices window from the main choices
 while true; do
-	_draw_choices main \
-		&& continue \
-		|| break
+	_draw_choices main
 done
 
 # everything redirected to fd3 will be displayed

@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
 debug=${debug:-false}
+setopt ERR_RETURN
 
 # redirect stderr so we can display the errors
 # when the ERR trap is called
@@ -8,22 +9,6 @@ exec 2>$stderr_file
 
 stdout_file=$(mktemp -t bzcurses.stdout.$$.XXXXX)
 exec 3>$stdout_file
-
-# TODO: add some more widgets:
-#      - file selector
-#      - ...
-
-# TODO: add option to checkboxes so it performs as radio
-
-# TODO: handle mouse click positions
-
-# TODO: rescale on terminal resize
-
-# TODO: implement sane wriiting and piping to stderr
-# without breaking either the stderr nor stdout.
-# this should work:
-# ./dirselect.example.zsh /foo/bar 2> >(grep 'blah')
-# ./dirselect.example.zsh /foo/bar 2> >(cat >file.txt)
 
 #       _      _
 #   ___| |_ __| |___  ___ _ __
@@ -58,7 +43,6 @@ choices_choice_prefix=" "
 # default actions if there is nothing defined
 buttons_actions.exit() {
 	yesno_exit
-	return 100 # 100 = do nothing
 }
 
 #        _           _
@@ -98,7 +82,7 @@ choices_buttons_actions.cancel() {
 # buttons and actions for checkboxes
 typeset -A checkboxes_buttons
 checkboxes_buttons=(
-	ok     "[OK]"
+	ok "[OK]"
 )
 checkboxes_buttons_order=( "ok" )
 
@@ -223,7 +207,9 @@ yesno_textbox_buttons_actions.no() {
 #   \__, |\___||___/_| |_|\___/___\___/_/\_\_|\__|
 #   |___/                    |_____|
 yesno_exit() {
-	_draw_yesno "Confirm exit" "Are you sure, that you want to exit?" && exit
+	debug_msg "YESNO EXIT: drawing dialog"
+	_draw_yesno "Confirm exit" "Are you sure, that you want to exit?" || return 0
+	[ $? -eq 0 ] && exit
 }
 
 
@@ -277,7 +263,6 @@ _set_position_array() {
 		tmp[stdscr_offset_x]=$(( $tmp[stdscr_offset_x] +1 ))
 	fi
 	for param in $params; do
-		debug_msg $name param: $param
 		case $param in
 			offset_y)
 				tmp[stdscr_offset_y]=$(( $tmp[stdscr_offset_y] +1 ))
@@ -402,12 +387,12 @@ _set_button_function_name() {
 				button_function=buttons_actions.${3}
 			} || {
 				# ... display error msg if neither is found
-				debug_msg $3 has NO FUNCTION
+				debug_msg "BUTTON for $1::$2::$3 has NO FUNCTION"
 				return
 			}
 		}
 	}
-	debug_msg $3 has function $button_function
+	debug_msg "$3 has function $button_function"
 	return
 }
 
@@ -434,8 +419,6 @@ _draw_buttons() {
 	local index
 	zcurses move ${1} 0 0
 	local sort_order_key="${buttons_var_prefix}_order"
-	debug_msg zcurses attr ${1} "$buttons_color"
-	debug_msg zcurses attr ${1} "$buttons_color"
 	zcurses attr ${1} "$buttons_color"
 	for ((index=1; index <= ${#${(P)sort_order_key}[@]}; ++index)); do
 		if [ $index -gt 1 ]; then
@@ -462,7 +445,7 @@ _draw_buttons() {
 #                          |___/_____|             |___/
 debug_msg() {
 	if [[ ${+zcurses_windows[(r)debug]} -ne 0 && $debug = true ]]; then
-		local prefix="[$(date +%H:%M:%S)]"
+		local prefix="[$(date +%H:%M:%S)] "
 		local row=""
 		# iterate over $* and validate line length
 		local tmp=( ${(@f)*} )
@@ -500,7 +483,7 @@ debug_msg() {
 #   \___|_| |_|\___/|_|\___\___|___\__,_|\___|\__|_|\___/|_| |_|
 #                             |_____|
 _parse_choice_action() {
-	debug_msg "parsing $1"
+	debug_msg "Choice Action: parsing $1"
 	local splitted=( $(echo ${1//::/ } ) )
 	local action=$splitted[1]
 	shift splitted
@@ -703,7 +686,7 @@ _draw_choices() {
 					fi
 				elif [ "$button_function" != "" ]; then
 					# if there is a button function defined call and handle it
-					debug_msg bf $button_function
+					debug_msg "Button Function: $1::$button_value::$button_function"
 					$button_function && {
 						local retval=$?
 					} || {
@@ -713,7 +696,7 @@ _draw_choices() {
 				else
 					# if there is no button_function defined we continue
 					# shown an error_msg and continue
-					error_msg "Button $button_value has no function or action defined."
+					error_msg "Button $1::$button_value has no function or action defined."
 					continue
 				fi
 				;;
@@ -799,7 +782,7 @@ _draw_textbox() {
 
 	let ${textbox_buttons_active_key}=1
 
-	debug_msg "drawing TEXTBOX $2"
+	debug_msg "drawing TEXTBOX for $1: '$2'"
 
 	# add textbox window
 	zcurses addwin textbox \
@@ -877,10 +860,10 @@ _draw_textbox() {
 
 		# overwrite button definitions if there is a definition for this textbox name
 		if [ ${(P)#$(echo ${1}_textbox_buttons)[@]} -gt 0 ]; then
-			debug_msg "TB: ${1}_textbox_buttons"
+			debug_msg "TEXTBOX Buttons: found button definition ${1}_textbox_buttons"
 			_draw_buttons "textbox_buttons" "${1}_textbox_buttons" "white/black"
 		else
-			debug_msg "TB: textbox_buttons"
+			debug_msg "TEXTBOX Buttons: using default button definition textbox_buttons"
 			_draw_buttons "textbox_buttons" "textbox_buttons" "white/black"
 		fi
 
@@ -980,7 +963,6 @@ _draw_textbox() {
 				fi
 				;;
 		esac
-		debug_msg "offset $textbox_scroll_offset"
 	done
 }
 
@@ -991,27 +973,39 @@ _draw_textbox() {
 #  | (__| | | |  __/ (__|   <| |_) | (_) >  <  __/\__ \
 #   \___|_| |_|\___|\___|_|\_\_.__/ \___/_/\_\___||___/
 _draw_checkboxes() {
-	local checkboxes_key=${1}_checkboxes
-	local checkbox_order_key=${1}_checkbox_order
-	local checkboxes_checked_key=${1}_checkboxes_checked
-	local intro_text="${(P)$(echo ${1}_checkboxes_intro_text):-no text defined}"
-	local title="${(P)$(echo ${1}_checkboxes_title):-no title defined}"
+	{ # validate and set variables
+		local checkboxes_key=${1}_checkboxes
+		local checkbox_order_key=${1}_checkbox_order
+		local checkboxes_checked_key=${1}_checkboxes_checked
+		local intro_text="${(P)$(echo ${1}_checkboxes_intro_text):-no text defined}"
+		local title="${(P)$(echo ${1}_checkboxes_title):-no title defined}"
+		
+# overwrite default button definitons if there is a definition for this $1 name
+		if [ ${(P)#$(echo ${1}_checkboxes_buttons)[@]} -gt 0 ]; then
+			local checkboxes_buttons_key=${1}_checkboxes_buttons
+			local checkboxes_buttons_order_key=${1}_checkboxes_buttons_order
+			local checkboxes_buttons_active_key=${1}_checkboxes_buttons_active
+		else
+			local checkboxes_buttons_key=checkboxes_buttons
+			local checkboxes_buttons_order_key=checkboxes_buttons_order
+			local checkboxes_buttons_active_key=checkboxes_buttons_active
+		fi
 
-	# overwrite default button definitons if there is a definition for this $1 name
-	if [ ${(P)#$(echo ${1}_checkboxes_buttons)[@]} -gt 0 ]; then
-		local checkboxes_buttons_key=${1}_checkboxes_buttons
-		local checkboxes_buttons_order_key=${1}_checkboxes_buttons_order
-		local checkboxes_buttons_active_key=${1}_checkboxes_buttons_active
-	else
-		local checkboxes_buttons_key=checkboxes_buttons
-		local checkboxes_buttons_order_key=checkboxes_buttons_order
-		local checkboxes_buttons_active_key=checkboxes_buttons_active
-	fi
+		let ${checkboxes_buttons_active_key}=1
 
-	let ${checkboxes_buttons_active_key}=1
-
-	{ # validate needed variables
+		# validate needed variables
 		local errors=""
+
+		if [ "${(t)${(P)checkboxes_buttons_key}}" != "association" ]; then
+			errors+="-> The variable ${checkboxes_buttons_key} is not set or no associative array."
+			errors+=$'\n'
+		fi
+
+		if [ "${(t)${(P)checkboxes_buttons_order_key}}" != "array" ]; then
+			errors+="-> The variable ${checkboxes_buttons_order_key} is not set or no array."
+			errors+=$'\n'
+		fi
+
 		if [ "${(t)${(P)$(echo ${1}_checkboxes)}}" != "association" ]; then
 			errors+="-> The variable ${1}_checkboxes is not set or no associative array."
 			errors+=$'\n'
@@ -1030,15 +1024,31 @@ _draw_checkboxes() {
 		# only compare arrays if these are surely set
 		if [[ ${#errors} -eq 0 \
 			&& ${#${(P)$(echo ${1}_checkbox_order)}} -ne ${#${(P)$(echo ${1}_checkboxes)}} ]]; then
-			errors+="-> The element count of ${1}_checkbox_order and ${1}_checkboxes is not equal."
-			errors+=$'\n'
-			errors+="   Make sure that these have a matching number of elements."
-			errors+=$'\n'
+			errors+="$(cat <<-EOF
+			The element count of ${checkbox_order_key} (${#${(P)checkbox_order_key}[@]}) and ${checkboxes_key} (${#${(P)checkboxes_key}[@]}) is not equal."
+			 
+			${checkbox_order_key}:
+			${(r:$(( ${#checkbox_order_key} +1 ))::=:)${}}
+			   ${"${(P)checkbox_order_key}"// /\n   }
+			 
+			${checkboxes_key}:
+			${(r:$(( ${#checkboxes_key} +1 ))::=:)${}}
+			   keys:
+			   -----
+			   ${(k)"${(P)checkboxes_key}"// /\n   }
+			 
+			   values:
+			   -------
+			$(printf '   %s\n' ${(v)${(P)checkboxes_key[@]}[@]})
+			 
+			 
+			Make sure that these have a matching number of elements."
+			EOF
+			)"
+			#${(r:${#${(P)checkbox_order_key}[@]}::=:)${}
 		fi
 
 		if [ "${(t)${(P)$(echo ${1}_checkbox_active)}}" != "integer" ]; then
-			debug_msg "INFO: variable ${1}_checkbox_active was not set as integer."
-			debug_msg "INFO: setting ${1}_checkbox_active to 1."
 			typeset -i $(echo ${1}_checkbox_active)
 			eval $(echo ${1}_checkbox_active)=1
 		fi
@@ -1231,7 +1241,6 @@ _draw_checkboxes() {
 				fi
 				;;
 			PRESSED5|DOWN)
-				debug_msg "[ ${(P)$(echo ${1}_checkbox_active)} -lt ${(P)#checkbox_order_key[@]} ]"
 				if [ ${(P)$(echo ${1}_checkbox_active)} -lt ${(P)#checkbox_order_key[@]} ]; then
 					let ${1}_checkbox_active=$(( ${1}_checkbox_active +1 ))
 				fi
@@ -1296,11 +1305,12 @@ err_trap() {
 		echo "---------------------------------"
 	} >> $error_log_file
 	has_err=true
-	exit
+	kill -INT $$
 }
 
 
 exit_trap() {
+	trap - QUIT INT
 	zcurses end
 	reset
 
@@ -1316,8 +1326,11 @@ exit_trap() {
 	}
 	return 0
 }
-trap 'err_trap "$0" "$LINENO"' ERR INT TERM
-trap 'exit_trap; return $?'    EXIT
+setopt PIPEFAIL
+trap 'err_trap "$0" "$LINENO"' ERR
+trap 'exit_trap; return $?'    EXIT QUIT INT
+
+#echo "foo $(asd) bar" >&3
 
 #   _                      _             _
 #  | |_ ___ _ __ _ __ ___ (_)_ __   __ _| |
@@ -1357,7 +1370,6 @@ _calculate_terminal_space() {
 	fi
 }
 _calculate_terminal_space
-
 
 #       _      _                            _           _
 #    __| | ___| |__  _   _  __ _  __      _(_)_ __   __| | _____      __
