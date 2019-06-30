@@ -46,6 +46,8 @@ choices_choice_prefix=" "
 # they will be matched against
 # the button text converted to upper case.
 button_icons+=(
+	"EDIT"      " "
+	"EDITOR"    " "
 	"BACK"      " "
 	"SEARCH"    " "
 	"FIND"      " "

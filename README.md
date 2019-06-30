@@ -30,7 +30,6 @@ Work in progress. Everything may change but I'll try to keep everything compatib
 	* dialogs I consider adding:
 		* file select
 		* datetime select
-		* tailbox
 		* text input
 		* forms
 		* ...

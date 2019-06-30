@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 debug=${debug:-false}
 
+
 #       _      _
 #   ___| |_ __| |___  ___ _ __
 #  / __| __/ _` / __|/ __| '__|
@@ -12,6 +13,22 @@ title_stdscr="bzcurses example"
 # for example, start this script like this
 # $ theme=nerdfonts ./example.zsh
 theme=${theme:-default}
+
+#   _        _ _                     _
+#  | |_ __ _(_) |__   _____  __   __| | ___ _ __ ___   ___
+#  | __/ _` | | '_ \ / _ \ \/ /  / _` |/ _ \ '_ ` _ \ / _ \
+#  | || (_| | | |_) | (_) >  <  | (_| |  __/ | | | | | (_) |
+#   \__\__,_|_|_.__/ \___/_/\_\  \__,_|\___|_| |_| |_|\___/
+tailbox_demo() {
+	mkfifo /tmp/fifo.$$
+	trap 'rm -f /tmp/fifo.$$' EXIT
+	
+	# this command lists all man pages and redirects
+	# stdout and stderr into the named pipe /tmp/fifo.$$
+	apropos . 1>/tmp/fifo.$$ 2>&1 &|
+
+	_draw_tailbox /tmp/fifo.$$ "Installed man pages"
+}
 
 #                   _
 #   _ __ ___   __ _(_)_ __    _ __ ___   ___ _ __  _   _
@@ -34,15 +51,17 @@ typeset -A main_choices=(
 	fasel     "Checkboxes collection fasel (has some undefined variables)."
 	undefined "Undefined checkboxes (will trigger error)."
 	unknown   "Undefined function (will trigger error)."
+	tailbox   "Launch Tailbox demo."
 )
 main_choice_order=(
-	blah fasel undefined unknown
+	blah fasel undefined unknown tailbox
 )
 typeset -A main_choice_actions=(
 	blah      "function::_draw_checkboxes::blah"
 	fasel     "function::_draw_checkboxes::fasel"
 	undefined "function::_draw_checkboxes::undefined"
 	unknown   "function::unknown::unknown"
+	tailbox   "function::tailbox_demo"
 )
 
 # overwrite the default button definitions
@@ -52,9 +71,10 @@ typeset -A main_choices_buttons=(
 	ok     "SELECT"
 	exit   "EXIT"
 	help   "HELP"
+	edit   "EDIT"
 	broken "BROKEN"
 )
-main_choices_buttons_order=( "ok" "exit" "help" "broken" )
+main_choices_buttons_order=( "ok" "exit" "help" "edit" "broken" )
 main_choices_buttons_active=1
 
 
@@ -170,3 +190,4 @@ done
 # after zcurses has ended
 echo BLAH:  $blah_checkboxes_checked[@] 1>&3
 echo FASEL: $fasel_checkboxes_checked[@] 1>&3
+

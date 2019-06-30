@@ -10,13 +10,16 @@ exec 2>$stderr_file
 stdout_file=$(mktemp -t bzcurses.stdout.$$.XXXXX)
 exec 3>$stdout_file
 
-#       _      _
-#   ___| |_ __| |___  ___ _ __
-#  / __| __/ _` / __|/ __| '__|
-#  \__ \ || (_| \__ \ (__| |
-#  |___/\__\__,_|___/\___|_|
-title_stdscr="${title_stdscr:-bzcurses}"
-
+#       _       __             _ _
+#    __| | ___ / _| __ _ _   _| | |_
+#   / _` |/ _ \ |_ / _` | | | | | __|
+#  | (_| |  __/  _| (_| | |_| | | |_
+#   \__,_|\___|_|  \__,_|\__,_|_|\__|
+#   _   _
+#  | |_| |__   ___ _ __ ___   ___
+#  | __| '_ \ / _ \ '_ ` _ \ / _ \
+#  | |_| | | |  __/ | | | | |  __/
+#   \__|_| |_|\___|_| |_| |_|\___|
 default_fg="black"
 default_bg="cyan"
 
@@ -24,7 +27,7 @@ error_fg="white"
 error_bg="red"
 
 scroll_indicator_fg="white"
-scroll_indicator_bg="cyan"
+scroll_indicator_bg="red"
 
 row_active_fg="black"
 row_active_bg="white"
@@ -39,22 +42,16 @@ button_active_postfix=" "
 button_inactive_prefix=" "
 button_inactive_postfix=" "
 
-#         _             _
-#    __ _| |_   _ _ __ | |__  ___
-#   / _` | | | | | '_ \| '_ \/ __|
-#  | (_| | | |_| | |_) | | | \__ \
-#   \__, |_|\__, | .__/|_| |_|___/
-#   |___/   |___/|_|
 checkbox_checked_chars="[X]"
 checkbox_unchecked_chars="[ ]"
 
 radio_checked_chars="(X)"
 radio_unchecked_chars="( )"
 
-scroll_up_indicator_char=""   # only 1 char allowed
-scroll_down_indicator_char="" # only 1 char allowed
+scroll_up_indicator_char="↑"   # only 1 char allowed
+scroll_down_indicator_char="↓" # only 1 char allowed
 
-choices_choice_prefix="> "
+choices_choice_prefix="→ "
 
 # the icons are added via theme and/or your script
 # if you use a theme that provides icons, you can
@@ -64,6 +61,27 @@ typeset -A button_icons=()
 
 button_prefix=" "
 button_postfix=" "
+
+#   _   _
+#  | |_| |__   ___ _ __ ___   ___
+#  | __| '_ \ / _ \ '_ ` _ \ / _ \
+#  | |_| | | |  __/ | | | | |  __/
+#   \__|_| |_|\___|_| |_| |_|\___|
+#                  _
+#    ___ _ __   __| |
+#   / _ \ '_ \ / _` |
+#  |  __/ | | | (_| |
+#   \___|_| |_|\__,_|
+
+
+
+
+#       _      _
+#   ___| |_ __| |___  ___ _ __
+#  / __| __/ _` / __|/ __| '__|
+#  \__ \ || (_| \__ \ (__| |
+#  |___/\__\__,_|___/\___|_|
+title_stdscr="${title_stdscr:-bzcurses}"
 
 #   _           _   _
 #  | |__  _   _| |_| |_ ___  _ __  ___
@@ -351,7 +369,7 @@ _parse_input_event() {
 	if [ "$input_event[key]" = 'MOUSE' ]; then
 		input_event[key]=$tmp[5]
 	fi
-	debug_msg "InputEvent: $input_event[key] $input_event[mouse]"
+	debug_msg "InputEvent: $input_event[key] M $input_event[mouse]"
 }
 
 
@@ -1339,6 +1357,98 @@ _draw_checkboxes() {
 	done
 }
 
+#   _        _ _ _
+#  | |_ __ _(_) | |__   _____  __
+#  | __/ _` | | | '_ \ / _ \ \/ /
+#  | || (_| | | | |_) | (_) >  <
+#   \__\__,_|_|_|_.__/ \___/_/\_\
+# expects a named pipe (see mkfifo) as $1
+# and will tail the pipe until it ends
+_draw_tailbox() {
+	if [ ! -p "$1" ]; then
+		echo "ERROR: '$1' is not a named pipe" 1>&2
+		false
+	fi
+	# add tailbox window
+	zcurses addwin tailbox \
+		$max_window_size[height] $max_window_size[width] \
+		$stdscr_position[offset_y] $stdscr_position[offset_x] \
+		stdscr
+	_set_position_array tailbox border
+
+	# cleanup windows on exit
+	trap '
+	zcurses clear tailbox;
+	zcurses delwin tailbox;
+	' EXIT
+
+	#trap 'exit 1' TERM INT
+	
+	zcurses clear tailbox
+	zcurses bg tailbox $default_fg/$default_bg
+	zcurses border tailbox
+
+	zcurses move tailbox \
+		$(( $tailbox_position[height] -1 )) \
+		${tailbox_position[offset_x]}
+	zcurses attr tailbox standout
+	zcurses string tailbox "Waiting for output from named pipe '$1'."
+	zcurses attr tailbox -standout
+	zcurses refresh tailbox
+
+	while read row; do
+		# overwrite the bottom border so it won't bleed into the previous msg
+		zcurses move tailbox $(( $tailbox_position[height] +1 )) 0
+		zcurses string tailbox "${(r:${$(( $tailbox_position[width] +1))}:: :)${}}"
+		while [ ${#row} -gt 0 ]; do
+			zcurses scroll tailbox +1
+			zcurses move tailbox \
+				$tailbox_position[height] \
+				${tailbox_position[offset_x]}
+			if [ $tailbox_position[width] -lt ${#row} ]; then
+				debug_msg "INFO: Text row is too long, wrapping. ${#row} (max=$tailbox_position[width])"
+				zcurses string tailbox "${row[1,$(( $tailbox_position[width] - $tailbox_position[offset_x] ))]}"
+				row="${${row[$tailbox_position[width],${#row}]}## }"
+			else
+				zcurses string tailbox "$row"
+				row=""
+			fi
+		done
+		zcurses border tailbox
+		# set window title
+		zcurses move tailbox 0 1
+		zcurses string tailbox "[${2:-title not set}]"
+		
+		zcurses refresh tailbox
+		sleep .001
+	done <"$1"
+
+	# overwrite the bottom border so it won't bleed into the previous msg
+	zcurses move tailbox $(( $tailbox_position[height] +1 )) 0
+	zcurses string tailbox "${(r:${$(( $tailbox_position[width] +1))}:: :)${}}"
+
+	zcurses scroll tailbox +2
+	zcurses border tailbox
+		
+	zcurses move tailbox \
+		$tailbox_position[height] \
+		${tailbox_position[offset_x]}
+	zcurses attr tailbox standout
+	zcurses string tailbox "Pipe '$1' has ended. Press any key to close this dialog."
+	zcurses refresh tailbox
+	zcurses attr tailbox -standout
+
+	# wait for user input and close the tailbox
+	# if any key is pressed.
+	while true; do
+		zcurses input stdscr raw key mouse
+		# ignore mouse events
+		[ "$mouse" = "" ] && break
+	done
+}
+
+
+
 #   _       _ _   _       _ _
 #  (_)_ __ (_) |_(_) __ _| (_)_______
 #  | | '_ \| | __| |/ _` | | |_  / _ \
@@ -1415,7 +1525,7 @@ if [ "$theme" != "default" ]; then
 	test -f "$theme_path" && {
 		. "$theme_path"
 	} || {
-		echo "ERROR: theme not found '${theme_path:A}'" 1>&2
+		echo "ERROR: theme not found '${theme_path}'" 1>&2
 		false
 	}
 fi
