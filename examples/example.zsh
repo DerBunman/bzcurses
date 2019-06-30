@@ -8,6 +8,11 @@ debug=${debug:-false}
 #  |___/\__\__,_|___/\___|_|
 title_stdscr="bzcurses example"
 
+# set default theme or from env variable
+# for example, start this script like this
+# $ theme=nerdfonts ./example.zsh
+theme=${theme:-default}
+
 #                   _
 #   _ __ ___   __ _(_)_ __    _ __ ___   ___ _ __  _   _
 #  | '_ ` _ \ / _` | | '_ \  | '_ ` _ \ / _ \ '_ \| | | |
@@ -25,7 +30,7 @@ EOF
 
 # main menu choices
 typeset -A main_choices=(
-	blah      "Checkboxes collection blah."
+	blah      "Radio select blah."
 	fasel     "Checkboxes collection fasel (has some undefined variables)."
 	undefined "Undefined checkboxes (will trigger error)."
 	unknown   "Undefined function (will trigger error)."
@@ -44,10 +49,10 @@ typeset -A main_choice_actions=(
 # button broken is an example for what will happen
 # when you forget to define a function for a button
 typeset -A main_choices_buttons=(
-	ok     "[SELECT]"
-	exit   "[EXIT]"
-	help   "[HELP]"
-	broken "[BROKEN]"
+	ok     "SELECT"
+	exit   "EXIT"
+	help   "HELP"
+	broken "BROKEN"
 )
 main_choices_buttons_order=( "ok" "exit" "help" "broken" )
 main_choices_buttons_active=1
@@ -144,8 +149,8 @@ blah_checkboxes_title="blahs Menu"
 
 # overwrite default buttons for blah checkboxes
 typeset -A blah_checkboxes_buttons=(
-	ok   "[BACK]"
-	exit "[EXIT]"
+	ok   "BACK"
+	exit "EXIT"
 )
 blah_checkboxes_buttons_order=( "ok" "exit" )
 blah_checkboxes_buttons_active=1

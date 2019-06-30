@@ -20,22 +20,50 @@ title_stdscr="${title_stdscr:-bzcurses}"
 default_fg="black"
 default_bg="cyan"
 
+error_fg="white"
+error_bg="red"
+
+scroll_indicator_fg="white"
+scroll_indicator_bg="cyan"
+
+row_active_fg="black"
+row_active_bg="white"
+
+button_active_fg="black"
+button_active_bg="white"
+button_inactive_fg="white"
+button_inactive_bg="black"
+
+button_active_prefix=" "
+button_active_postfix=" "
+button_inactive_prefix=" "
+button_inactive_postfix=" "
+
 #         _             _
 #    __ _| |_   _ _ __ | |__  ___
 #   / _` | | | | | '_ \| '_ \/ __|
 #  | (_| | | |_| | |_) | | | \__ \
 #   \__, |_|\__, | .__/|_| |_|___/
 #   |___/   |___/|_|
-checkbox_checked_chars="[]"
+checkbox_checked_chars="[X]"
 checkbox_unchecked_chars="[ ]"
 
-radio_checked_chars="(●)"
+radio_checked_chars="(X)"
 radio_unchecked_chars="( )"
 
 scroll_up_indicator_char=""   # only 1 char allowed
 scroll_down_indicator_char="" # only 1 char allowed
 
-choices_choice_prefix=" "
+choices_choice_prefix="> "
+
+# the icons are added via theme and/or your script
+# if you use a theme that provides icons, you can
+# append icons to the button_icons or you can overwrite
+# the complete array. whatever floats your boat.
+typeset -A button_icons=()
+
+button_prefix=" "
+button_postfix=" "
 
 #   _           _   _
 #  | |__  _   _| |_| |_ ___  _ __  ___
@@ -62,9 +90,9 @@ buttons_actions.exit() {
 # buttons and actions for choices
 typeset -A choices_buttons
 choices_buttons=(
-	ok     "[SELECT]"
-	cancel "[CANCEL]"
-	help   "[HELP]"
+	ok     "SELECT"
+	cancel "CANCEL"
+	help   "HELP"
 )
 choices_buttons_order=( "ok" "cancel" "help" )
 
@@ -86,7 +114,7 @@ choices_buttons_actions.cancel() {
 # buttons and actions for checkboxes
 typeset -A checkboxes_buttons
 checkboxes_buttons=(
-	ok "[OK]"
+	ok "OK"
 )
 checkboxes_buttons_order=( "ok" )
 
@@ -109,7 +137,7 @@ checkboxes_buttons_actions.ok() {
 # buttons and actions for textbox
 typeset -A textbox_buttons
 textbox_buttons=(
-	ok "[OK]"
+	ok "OK"
 )
 textbox_buttons_order=( "ok" )
 textbox_buttons_active=1
@@ -137,7 +165,7 @@ textbox_buttons_actions.ok() {
 # buttons and actions for error textbox
 typeset -A error_textbox_buttons
 error_textbox_buttons=(
-	ok "[OK]"
+	ok "OK"
 )
 error_textbox_buttons_order=( "ok" )
 error_textbox_buttons_active=1
@@ -166,8 +194,8 @@ error_textbox_buttons_actions.ok() {
 #                         |___/
 typeset -A yesno_textbox_buttons
 yesno_textbox_buttons=(
-	yes "[YES]"
-	no  "[NO]"
+	yes "YES"
+	no  "NO"
 )
 yesno_textbox_buttons_order=( "no" "yes" )
 yesno_textbox_buttons_active=1
@@ -411,33 +439,40 @@ _set_button_function_name() {
 # so the array and button window names have to match
 # TODO: validate that the button variables are defined and correct
 #
-# example: _draw_buttons choices_buttons [alternate_variable_prefix [buttons_color]]
+# example: _draw_buttons choices_buttons [alternate_variable_prefix]
 _draw_buttons() {
 	local buttons_var_prefix=${2:-$1}
-	[ "${3}" != "" ] && {
-		local buttons_color="$3"
-	} || {
-		local buttons_color=white/black
-	}
-	#local window_color=${4:-$default_fg/$default_bg}
 	local index
 	zcurses move ${1} 0 0
 	local sort_order_key="${buttons_var_prefix}_order"
-	zcurses attr ${1} "$buttons_color"
+	zcurses attr ${1} "$button_inactive_fg/$button_inactive_bg"
 	for ((index=1; index <= ${#${(P)sort_order_key}[@]}; ++index)); do
 		if [ $index -gt 1 ]; then
 			zcurses position "$1" pos
 			zcurses move ${1} $pos[1] $(( $pos[2] +1 ))
 		fi
 		#zcurses attr ${1} "$window_color"
+		local button_prefix=${button_inactive_prefix}
+		local button_postfix=${button_inactive_postfix}
 		local active_element_key="${buttons_var_prefix}_active"
 		if [ $index -eq ${(P)active_element_key} ]; then
-			zcurses attr ${1} standout
+			local button_prefix=${button_active_prefix}
+			local button_postfix=${button_active_postfix}
+			zcurses attr ${1} "$button_active_fg/$button_active_bg"
+			#zcurses attr ${1} standout
 		fi
 
-		zcurses string ${1} "${${(P)buttons_var_prefix}[${${(P)sort_order_key}[$index]}]}"
-		#zcurses attr ${1} "$buttons_color"
-		zcurses attr ${1} -standout
+		local button_text="${${(P)buttons_var_prefix}[${${(P)sort_order_key}[$index]}]}"
+		local icon_string=""
+		if [ $+button_icons[$button_text] -gt 0 ]; then
+			icon_string="${button_icons[$button_text:u]}"
+		elif [ $+button_icons[UNDEFINED] -gt 0 ]; then
+			icon_string="${button_icons[UNDEFINED]}"
+		fi
+		
+		zcurses string ${1} "${button_prefix:-|}${icon_string}${button_text}${button_postfix:-|}"
+		zcurses attr ${1} "$button_inactive_fg/$button_inactive_bg"
+		#zcurses attr ${1} -standout
 	done
 }
 
@@ -621,7 +656,7 @@ _draw_choices() {
 
 			# add scroll up indicator
 			zcurses move choices_choices 1 $(( $choices_choices_position[outer_width] -${#scroll_up_indicator_char} ))
-			zcurses bg choices_choices white/red
+			zcurses bg choices_choices $scroll_indicator_fg/$scroll_indicator_bg
 			zcurses string choices_choices "$scroll_up_indicator_char"
 			zcurses bg choices_choices $default_fg/$default_bg
 		fi
@@ -635,7 +670,7 @@ _draw_choices() {
 		i=1
 		for ((; index <= ${#choice_order[@]}; ++index)); do
 			if [ $i -gt $choices_choices_position[height] ]; then
-				zcurses bg choices_choices white/red
+				zcurses bg choices_choices $scroll_indicator_fg/$scroll_indicator_bg
 				# we are already at the bottom right
 				zcurses move choices_choices \
 					$choices_choices_position[height] $(( $choices_choices_position[width] +2 -${#scroll_down_indicator_char} ))
@@ -645,13 +680,15 @@ _draw_choices() {
 			fi
 			zcurses move choices_choices $i $choices_choices_position[offset_x]
 			if [ $index -eq ${(P)${choice_active_key}} ]; then
-				zcurses attr choices_choices white/black
+				zcurses attr choices_choices $row_active_fg/$row_active_bg
+				zcurses attr choices_choices bold
 			else
 				zcurses attr choices_choices $default_fg/$default_bg
 			fi
 
 			zcurses string choices_choices \
 				"${choices_choice_prefix}${(r:${$(( ${choices_choices_position[width]} - ${#choices_choice_prefix} ))}:: :)${(P)choices_key}[${choice_order[${index}]}]}"
+			zcurses attr choices_choices -bold
 			zcurses attr choices_choices $default_fg/$default_bg
 			(( i = i +1 ))
 		done
@@ -840,8 +877,8 @@ _draw_textbox() {
 
 	# red background if title = Error
 	if [ "$1" = "error" ]; then
-		local fg=black
-		local bg=red
+		local fg=$error_fg
+		local bg=$error_bg
 	else
 		local fg=$default_fg
 		local bg=$default_bg
@@ -865,10 +902,10 @@ _draw_textbox() {
 		# overwrite button definitions if there is a definition for this textbox name
 		if [ ${(P)#$(echo ${1}_textbox_buttons)[@]} -gt 0 ]; then
 			debug_msg "TEXTBOX Buttons: found button definition ${1}_textbox_buttons"
-			_draw_buttons "textbox_buttons" "${1}_textbox_buttons" "white/black"
+			_draw_buttons "textbox_buttons" "${1}_textbox_buttons"
 		else
 			debug_msg "TEXTBOX Buttons: using default button definition textbox_buttons"
-			_draw_buttons "textbox_buttons" "textbox_buttons" "white/black"
+			_draw_buttons "textbox_buttons" "textbox_buttons"
 		fi
 
 		# write title
@@ -886,7 +923,7 @@ _draw_textbox() {
 				zcurses move textbox_text \
 					$textbox_text_position[height] \
 					$(( $textbox_text_position[width] + $textbox_text_position[offset_y] ))
-				zcurses attr textbox_text white/red
+				zcurses attr textbox_text $scroll_indicator_fg/$scroll_indicator_bg
 				zcurses string textbox_text "$scroll_down_indicator_char"
 				zcurses bg textbox_text $fg/$bg
 				break
@@ -901,7 +938,7 @@ _draw_textbox() {
 			zcurses move textbox_text \
 				$textbox_text_position[offset_y] \
 				$(( $textbox_text_position[width] + $textbox_text_position[offset_y] ))
-			zcurses attr textbox_text white/red
+			zcurses attr textbox_text $scroll_indicator_fg/$scroll_indicator_bg
 			zcurses string textbox_text "$scroll_up_indicator_char"
 			zcurses attr textbox_text $fg/$bg
 		fi
@@ -1164,7 +1201,7 @@ _draw_checkboxes() {
 			# add scroll up indicator if there are checkboxes above the visible area
 			zcurses move checkboxes_checkboxes \
 				1 $(( $checkboxes_checkboxes_position[width] + $checkboxes_checkboxes_position[offset_x] ))
-			zcurses bg checkboxes_checkboxes white/red
+			zcurses bg checkboxes_checkboxes $scroll_indicator_fg/$scroll_indicator_bg
 			zcurses string checkboxes_checkboxes "$scroll_up_indicator_char"
 			zcurses bg checkboxes_checkboxes $default_fg/$default_bg
 		fi
@@ -1181,7 +1218,7 @@ _draw_checkboxes() {
 			zcurses move checkboxes_checkboxes $i 1
 			# highlight active checkbox
 			if [ $index -eq ${(P)$(echo ${1}_checkbox_active)} ]; then
-				zcurses attr checkboxes_checkboxes white/black
+				zcurses attr checkboxes_checkboxes $row_active_fg/$row_active_bg
 			fi
 			# draw the checkbox
 			if [ "${${(P)checkboxes_checked_key}[(r)${${(P)checkbox_order_key}[${index}]}]}" = "${${(P)checkbox_order_key}[${index}]}" ]; then
@@ -1210,7 +1247,7 @@ _draw_checkboxes() {
 				zcurses move checkboxes_checkboxes \
 					$checkboxes_checkboxes_position[height] \
 					$(( $checkboxes_checkboxes_position[width] + $checkboxes_checkboxes_position[offset_x] ))
-				zcurses bg checkboxes_checkboxes white/red
+				zcurses bg checkboxes_checkboxes $scroll_indicator_fg/$scroll_indicator_bg
 				zcurses string checkboxes_checkboxes "$scroll_down_indicator_char"
 				zcurses bg checkboxes_checkboxes $default_fg/$default_bg
 				break
@@ -1352,6 +1389,37 @@ setopt PIPEFAIL
 trap 'err_trap "$0" "$LINENO"' ERR
 trap 'exit_trap; return $?'    EXIT QUIT INT TERM
 
+#   _   _
+#  | |_| |__   ___ _ __ ___   ___
+#  | __| '_ \ / _ \ '_ ` _ \ / _ \
+#  | |_| | | |  __/ | | | | |  __/
+#   \__|_| |_|\___|_| |_| |_|\___|
+if [[ "${theme:-undefined}" = "undefined" && $+commands[fc-list] -gt 0 ]]; then
+	# try to detect wether nerdfonts are installed or not
+	# and if they are installed use the nerdfonts theme 
+	# as default theme because we assume that who has them
+	# installed is also using them.
+	fc-list | grep -i "nerdfonts" >/dev/null && {
+		theme="nerdfonts"
+	} || {
+		theme="default"
+	}
+elif [ "${theme:-undefined}" = "undefined" ]; then
+	theme="default"
+fi
+
+# the default theme is defined in the head of this file
+# themes will overwrite the default theme variables
+if [ "$theme" != "default" ]; then
+	theme_path="${0:h}/bzcurses.${theme}.theme.zsh"
+	test -f "$theme_path" && {
+		. "$theme_path"
+	} || {
+		echo "ERROR: theme not found '${theme_path:A}'" 1>&2
+		false
+	}
+fi
+
 #   _                      _             _
 #  | |_ ___ _ __ _ __ ___ (_)_ __   __ _| |
 #  | __/ _ \ '__| '_ ` _ \| | '_ \ / _` | |
@@ -1410,6 +1478,9 @@ if [ $debug = true ]; then
 	)
 
 	debug_msg "debug mode active"
+else
+	# overwrite function
+	debug_msg() {}
 fi
 
 # set the postion array for stdscr so we know
