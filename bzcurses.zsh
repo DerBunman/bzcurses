@@ -29,6 +29,9 @@ default_bg="cyan"
 checkbox_checked_chars="[]"
 checkbox_unchecked_chars="[ ]"
 
+radio_checked_chars="(●)"
+radio_unchecked_chars="( )"
+
 scroll_up_indicator_char=""   # only 1 char allowed
 scroll_down_indicator_char="" # only 1 char allowed
 
@@ -42,7 +45,8 @@ choices_choice_prefix=" "
 
 # default actions if there is nothing defined
 buttons_actions.exit() {
-	yesno_exit
+	yesno_exit && return 100
+	[ $? -eq 1 ] && exit
 }
 
 #        _           _
@@ -979,8 +983,9 @@ _draw_checkboxes() {
 		local checkboxes_checked_key=${1}_checkboxes_checked
 		local intro_text="${(P)$(echo ${1}_checkboxes_intro_text):-no text defined}"
 		local title="${(P)$(echo ${1}_checkboxes_title):-no title defined}"
-		
-# overwrite default button definitons if there is a definition for this $1 name
+		local checkboxes_behavior=${(P)$(echo ${1}_checkboxes_behavior):-checkbox}
+
+		# overwrite default button definitons if there is a definition for this $1 name
 		if [ ${(P)#$(echo ${1}_checkboxes_buttons)[@]} -gt 0 ]; then
 			local checkboxes_buttons_key=${1}_checkboxes_buttons
 			local checkboxes_buttons_order_key=${1}_checkboxes_buttons_order
@@ -995,6 +1000,13 @@ _draw_checkboxes() {
 
 		# validate needed variables
 		local errors=""
+		
+		typeset -a allowed_checkboxes_behaviors=( "checkbox" "radio" )
+		if [ "$allowed_checkboxes_behaviors[(r)$checkboxes_behavior]" != "$checkboxes_behavior" ]; then
+			errors+="-> The variable {1}_checkboxes_behavior is set to unknown value '${checkboxes_behavior}'."
+			errors+="   Allowed: ${allowed_checkboxes_behaviors}"
+			errors+=$'\n'
+		fi
 
 		if [ "${(t)${(P)checkboxes_buttons_key}}" != "association" ]; then
 			errors+="-> The variable ${checkboxes_buttons_key} is not set or no associative array."
@@ -1060,6 +1072,11 @@ _draw_checkboxes() {
 			return 1
 		fi
 	}
+
+	if [ "$checkboxes_behavior" = "radio" ]; then
+		local checkbox_checked_chars=${radio_checked_chars}
+		local checkbox_unchecked_chars=${radio_unchecked_chars}
+	fi
 
 	# height of the textarea above the checkboxes
 	local checkboxes_text_height=3
@@ -1264,16 +1281,21 @@ _draw_checkboxes() {
 			" ")
 				# check or uncheck checkbox
 				local checkbox_active_key=${${(P)checkbox_order_key}[${1}_checkbox_active]}
-				if [ "${${(P)checkboxes_checked_key}[(r)${checkbox_active_key}]}" = "$checkbox_active_key" ]; then
+				if [ "$checkboxes_behavior" = "radio" ]; then
+					# if the behavior type is radio we can only have one checked field
+					eval "${1}_checkboxes_checked=( $checkbox_active_key )"
+				else # checkboxes_behavior = checkbox
+					if [ "${${(P)checkboxes_checked_key}[(r)${checkbox_active_key}]}" = "$checkbox_active_key" ]; then
 
-					eval "${1}_checkboxes_checked=( ${(@)${(P)checkboxes_checked_key}:#$checkbox_active_key} )"
-				else
-					eval "${1}_checkboxes_checked=( ${(P)checkboxes_checked_key} $checkbox_active_key )"
-				fi
+						eval "${1}_checkboxes_checked=( ${(@)${(P)checkboxes_checked_key}:#$checkbox_active_key} )"
+					else
+						eval "${1}_checkboxes_checked=( ${(P)checkboxes_checked_key} $checkbox_active_key )"
+					fi
 
-				# scroll down after toggle
-				if [ ${(P)$(echo ${1}_checkbox_active)} -lt ${(P)#checkbox_order_key[@]} ]; then
-					let ${1}_checkbox_active=$(( ${1}_checkbox_active +1 ))
+					# scroll down after toggle
+					if [ ${(P)$(echo ${1}_checkbox_active)} -lt ${(P)#checkbox_order_key[@]} ]; then
+						let ${1}_checkbox_active=$(( ${1}_checkbox_active +1 ))
+					fi
 				fi
 				;;
 		esac
@@ -1310,7 +1332,7 @@ err_trap() {
 
 
 exit_trap() {
-	trap - QUIT INT
+	trap - ERR EXIT QUIT INT TERM
 	zcurses end
 	reset
 
@@ -1328,9 +1350,7 @@ exit_trap() {
 }
 setopt PIPEFAIL
 trap 'err_trap "$0" "$LINENO"' ERR
-trap 'exit_trap; return $?'    EXIT QUIT INT
-
-#echo "foo $(asd) bar" >&3
+trap 'exit_trap; return $?'    EXIT QUIT INT TERM
 
 #   _                      _             _
 #  | |_ ___ _ __ _ __ ___ (_)_ __   __ _| |

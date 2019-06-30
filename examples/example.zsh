@@ -66,6 +66,16 @@ main_choices_buttons_actions.help() {
 	_draw_textbox help "Help" "$main_choices_help_text"
 }
 
+#    __                _
+#   / _| __ _ ___  ___| |
+#  | |_ / _` / __|/ _ \ |
+#  |  _| (_| \__ \  __/ |
+#  |_|  \__,_|___/\___|_|
+#        _               _    _
+#    ___| |__   ___  ___| | _| |__   _____  _____  ___
+#   / __| '_ \ / _ \/ __| |/ / '_ \ / _ \ \/ / _ \/ __|
+#  | (__| | | |  __/ (__|   <| |_) | (_) >  <  __/\__ \
+#   \___|_| |_|\___|\___|_|\_\_.__/ \___/_/\_\___||___/
 # the _checkboxes is an associative array that defines
 # the name and the title of the checkboxes
 typeset -A fasel_checkboxes=(
@@ -90,11 +100,16 @@ fasel_checkboxes_checked=( foo1 baz2 bar1 )
 fasel_checkbox_order=( ${(k)fasel_checkboxes} )
 
 
-#   _               _          _               _    _
-#  | |__   ___  ___| |_    ___| |__   ___  ___| | _| |__   _____  _____  ___
-#  | '_ \ / _ \/ __| __|  / __| '_ \ / _ \/ __| |/ / '_ \ / _ \ \/ / _ \/ __|
-#  | | | | (_) \__ \ |_  | (__| | | |  __/ (__|   <| |_) | (_) >  <  __/\__ \
-#  |_| |_|\___/|___/\__|  \___|_| |_|\___|\___|_|\_\_.__/ \___/_/\_\___||___/
+#   _     _       _
+#  | |__ | | __ _| |__
+#  | '_ \| |/ _` | '_ \
+#  | |_) | | (_| | | | |
+#  |_.__/|_|\__,_|_| |_|
+#        _               _    _
+#    ___| |__   ___  ___| | _| |__   _____  _____  ___
+#   / __| '_ \ / _ \/ __| |/ / '_ \ / _ \ \/ / _ \/ __|
+#  | (__| | | |  __/ (__|   <| |_) | (_) >  <  __/\__ \
+#   \___|_| |_|\___|\___|_|\_\_.__/ \___/_/\_\___||___/
 # the _checkboxes is an associative array that defines
 # the name and the title of the checkboxes
 typeset -A blah_checkboxes=(
@@ -110,7 +125,7 @@ typeset -A blah_checkboxes=(
 	blah10 "text10 blah blah"
 )
 # the _checkboxes_checked array contains the names of all checked boxes
-blah_checkboxes_checked=( blah01 blah02 blah03 )
+blah_checkboxes_checked=( blah01 )
 # since associative arrays in zsh are unordered and
 # arrays are ordered we define _checkbox_order as an
 # array containing the keys of _checkboxes.
@@ -118,6 +133,7 @@ blah_checkboxes_checked=( blah01 blah02 blah03 )
 blah_checkbox_order=(
 	blah01 blah02 blah03 blah04 blah05 blah06 blah07 blah08 blah09 blah10
 )
+blah_checkboxes_behavior="radio"
 
 blah_checkboxes_intro_text=$(cat <<EOF
 This is a intro text.
