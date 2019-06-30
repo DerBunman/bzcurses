@@ -29,4 +29,4 @@ for i in $( seq 1 100 ); do
 	sleep 1
 done 1>/tmp/fifo.$$ 2>&1 &|
 
-_draw_tailbox /tmp/fifo.$$ "Tailbox demo"
+_draw_tailbox /tmp/fifo.$$ "Listing nice numbers."
