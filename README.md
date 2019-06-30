@@ -25,9 +25,9 @@ Work in progress. Everything may change but I'll try to be compatible
 * handle terminal resize somehow
 * add function to validate all the dialog definitions
 * handle mouse clicks
+* colorschemes and themes
 * dialogs
 	* dialogs I consider adding:
-		* radio select
 		* file select
 		* datetime select
 		* tailbox
