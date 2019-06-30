@@ -14,6 +14,7 @@ Work in progress. Everything may change but I'll try to keep everything compatib
 	* choices dialog (a menu)
 	* textbox (to display text)
 	* error messages
+	* tailbox (reads and displays a named pipe)
 * debug mode toggleable via debug=true
 * scales to terminal size (only on startup)
 * themes (colors, pre/postfixes, icons)
