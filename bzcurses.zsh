@@ -1399,7 +1399,7 @@ _draw_tailbox() {
 	while read row; do
 		# overwrite the bottom border so it won't bleed into the previous msg
 		zcurses move tailbox $(( $tailbox_position[height] +1 )) 0
-		zcurses string tailbox "${(r:${$(( $tailbox_position[width] +1))}:: :)${}}"
+		zcurses string tailbox "${(r:${$(( $tailbox_position[width] + $tailbox_position[offset_x] *2 ))}:: :)${}}"
 		while [ ${#row} -gt 0 ]; do
 			zcurses scroll tailbox +1
 			zcurses move tailbox \
@@ -1425,7 +1425,7 @@ _draw_tailbox() {
 
 	# overwrite the bottom border so it won't bleed into the previous msg
 	zcurses move tailbox $(( $tailbox_position[height] +1 )) 0
-	zcurses string tailbox "${(r:${$(( $tailbox_position[width] +1))}:: :)${}}"
+	zcurses string tailbox "${(r:${$(( $tailbox_position[width] + $tailbox_position[offset_x] *2 ))}:: :)${}}"
 
 	zcurses scroll tailbox +2
 	zcurses border tailbox
