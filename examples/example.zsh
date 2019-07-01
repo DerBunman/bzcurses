@@ -14,11 +14,12 @@ title_stdscr="bzcurses example"
 # $ theme=nerdfonts ./example.zsh
 theme=${theme:-default}
 
-#   _        _ _                     _
-#  | |_ __ _(_) |__   _____  __   __| | ___ _ __ ___   ___
-#  | __/ _` | | '_ \ / _ \ \/ /  / _` |/ _ \ '_ ` _ \ / _ \
-#  | || (_| | | |_) | (_) >  <  | (_| |  __/ | | | | | (_) |
-#   \__\__,_|_|_.__/ \___/_/\_\  \__,_|\___|_| |_| |_|\___/
+#   _        _ _ _                      _
+#  | |_ __ _(_) | |__   _____  __    __| | ___ _ __ ___   ___
+#  | __/ _` | | | '_ \ / _ \ \/ /   / _` |/ _ \ '_ ` _ \ / _ \
+#  | || (_| | | | |_) | (_) >  <   | (_| |  __/ | | | | | (_) |
+#   \__\__,_|_|_|_.__/ \___/_/\_\___\__,_|\___|_| |_| |_|\___/
+#                              |_____|
 tailbox_demo() {
 	mkfifo /tmp/fifo.$$
 	trap 'rm -f /tmp/fifo.$$' EXIT
@@ -28,6 +29,18 @@ tailbox_demo() {
 	apropos . 1>/tmp/fifo.$$ 2>&1 &|
 
 	_draw_tailbox /tmp/fifo.$$ "Installed man pages"
+}
+
+#  
+#    ___ _ __ _ __ ___  _ __   ___  ___  _   _ ___
+#   / _ \ '__| '__/ _ \| '_ \ / _ \/ _ \| | | / __|
+#  |  __/ |  | | | (_) | | | |  __/ (_) | |_| \__ \
+#   \___|_|  |_|  \___/|_| |_|\___|\___/ \__,_|___/
+erroneous() {
+	debug_msg "foo"
+	# asd is undefined and will trigger an error 127
+	asd
+	debug_msg "bar"
 }
 
 #                   _
@@ -49,19 +62,23 @@ EOF
 typeset -A main_choices=(
 	blah      "Radio select blah."
 	fasel     "Checkboxes collection fasel (has some undefined variables)."
-	undefined "Undefined checkboxes (will trigger error)."
-	unknown   "Undefined function (will trigger error)."
+	undefined "Undefined checkboxes (will trigger an error_message)."
+	unknown   "Undefined function (will trigger an error_message)."
+	error     "Launches a function that has errors to test error handling."
 	tailbox   "Launch Tailbox demo."
+	editor    "Launches \$EDITOR."
 )
 main_choice_order=(
-	blah fasel undefined unknown tailbox
+	blah fasel undefined unknown error tailbox editor
 )
 typeset -A main_choice_actions=(
 	blah      "function::_draw_checkboxes::blah"
 	fasel     "function::_draw_checkboxes::fasel"
 	undefined "function::_draw_checkboxes::undefined"
 	unknown   "function::unknown::unknown"
+	error     "function::erroneous"
 	tailbox   "function::tailbox_demo"
+	editor    "function::_run_editor::/etc/fstab::3"
 )
 
 # overwrite the default button definitions
@@ -188,6 +205,6 @@ done
 
 # everything redirected to fd3 will be displayed
 # after zcurses has ended
-echo BLAH:  $blah_checkboxes_checked[@] 1>&3
-echo FASEL: $fasel_checkboxes_checked[@] 1>&3
+#echo BLAH:  $blah_checkboxes_checked[@] 1>&3
+#echo FASEL: $fasel_checkboxes_checked[@] 1>&3
 

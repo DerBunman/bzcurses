@@ -1,13 +1,11 @@
 #!/usr/bin/env zsh
+setopt PIPEFAIL ERR_EXIT
 debug=${debug:-false}
 
 # redirect stderr so we can display the errors
 # when the ERR trap is called
 stderr_file=$(mktemp -t bzcurses.stderr.$$.XXXXX)
 exec 2>$stderr_file
-
-stdout_file=$(mktemp -t bzcurses.stdout.$$.XXXXX)
-exec 3>$stdout_file
 
 #       _       __             _ _
 #    __| | ___ / _| __ _ _   _| | |_
@@ -552,7 +550,17 @@ _parse_choice_action() {
 			return 0
 		}
 		debug_msg "Calling: $func ${splitted}"
-		$func "${splitted}"
+		"$func" "${splitted[@]}"
+
+	elif [ "$action" = "command" ]; then
+		if ! (( $+commands[$splitted[1]] )); then
+			error_msg "Unknown command '${splitted[1]}' defined."
+		else
+			local cmd=$splitted[1]
+			shift splitted
+			"$cmd" "${splitted[@]}"
+
+		fi
 	else
 		error_msg "Unknown action '${action}' defined."
 	fi
@@ -739,7 +747,7 @@ _draw_choices() {
 						return 0
 					else
 						_parse_choice_action "${action}"
-						return $?
+						return
 					fi
 				elif [ "$button_function" != "" ]; then
 					# if there is a button function defined call and handle it
@@ -1122,7 +1130,7 @@ _draw_checkboxes() {
 			local error_intro="Errors occured while trying to generate the checkbox dialog '${1}':"
 			error_intro+=$'\n'
 			error_msg "${error_intro}$( echo $errors )"
-			return 1
+			return
 		fi
 	}
 
@@ -1444,7 +1452,22 @@ _draw_tailbox() {
 	done
 }
 
-
+# _run_editor $file [$line]
+_run_editor() {
+	editor=${EDITOR:-nano}
+	if (( $+commands[$editor] )); then
+		[ "$#" -eq 1 ] && {
+			"$editor" "$1"
+		} || {
+			"$editor" "+$2" "$1"
+		}
+	else
+		error_msg "Could not launch $editor, because it is not in the path."
+	fi
+	# this will redraw all windows after beeing
+	# messed up by something that wrote to stdout
+	_draw_stdscr 
+}
 
 #   _       _ _   _       _ _
 #  (_)_ __ (_) |_(_) __ _| (_)_______
@@ -1464,11 +1487,18 @@ zcurses init
 has_err=false
 error_log_file=$(mktemp -t bzcurses.error_log.$$.XXXXX)
 err_trap() {
-	echo "[ERROR] in $1 at $2" >> $error_log_file
 	{
-		echo "ERROR_MESSAGE: "
-		cat $stderr_file && echo >$stderr_file
-		echo "---------------------------------"
+		echo "============================================"
+		echo "Error in file $funcfiletrace[1] ($functrace[1])":
+		echo "$(cat $stderr_file && echo >$stderr_file)"
+		echo ""
+		echo "TRACE:"
+		echo "------"
+		for ((index=1; index <= ${#funcfiletrace[@]}; ++index)); do
+			echo "${funcfiletrace[index]} -> ${functrace[index]}"
+		done | column -t
+		echo "--------------------------------------------"
+		echo ""
 	} >> $error_log_file
 	has_err=true
 	kill -INT $$
@@ -1476,25 +1506,15 @@ err_trap() {
 
 
 exit_trap() {
-	zcurses end
-	reset
 	trap - EXIT INT
 	test -f $error_log_file && cat $error_log_file
-	test -f $stdout_file && cat $stdout_file
-	test -f $stderr_file && cat $stderr_file
 
-	test -f $stdout_file && rm -f $stdout_file
 	test -f $stderr_file && rm -f $stderr_file
 	test -f $error_log_file && rm -f $error_log_file
 
-	[ $has_err != false ] && {
-		exit 1
-	}
-	exit 0
 }
-setopt PIPEFAIL ERR_EXIT
-trap 'err_trap "$0" "$LINENO"' ERR ZERR
-trap 'exit_trap;'              EXIT QUIT INT TERM
+trap 'err_trap "$0" "$LINENO";'       ERR ZERR
+trap 'zcurses end; reset; exit_trap;' EXIT INT
 
 #   _   _
 #  | |_| |__   ___ _ __ ___   ___
@@ -1612,8 +1632,12 @@ max_window_size=(
 #  | '_ \ / _ \| '__/ _` |/ _ \ '__|
 #  | |_) | (_) | | | (_| |  __/ |
 #  |_.__/ \___/|_|  \__,_|\___|_|
-zcurses move stdscr 0 0
-zcurses attr stdscr bold
-zcurses string stdscr "[${title_stdscr}]"
-zcurses attr stdscr -bold
-zcurses refresh stdscr
+_draw_stdscr() {
+	zcurses clear stdscr redraw
+	zcurses move stdscr 0 0
+	zcurses attr stdscr bold
+	zcurses string stdscr "[${title_stdscr}]"
+	zcurses attr stdscr -bold
+	zcurses refresh stdscr
+}
+_draw_stdscr
