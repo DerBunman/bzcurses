@@ -705,14 +705,12 @@ _draw_choices() {
 			zcurses move choices_choices $i $choices_choices_position[offset_x]
 			if [ $index -eq ${(P)${choice_active_key}} ]; then
 				zcurses attr choices_choices $row_active_fg/$row_active_bg
-				zcurses attr choices_choices bold
 			else
 				zcurses attr choices_choices $default_fg/$default_bg
 			fi
 
 			zcurses string choices_choices \
 				"${choices_choice_prefix}${(r:${$(( ${choices_choices_position[width]} - ${#choices_choice_prefix} ))}:: :)${(P)choices_key}[${choice_order[${index}]}]}"
-			zcurses attr choices_choices -bold
 			zcurses attr choices_choices $default_fg/$default_bg
 			(( i = i +1 ))
 		done
