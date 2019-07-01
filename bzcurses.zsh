@@ -1,6 +1,5 @@
 #!/usr/bin/env zsh
 debug=${debug:-false}
-setopt ERR_RETURN
 
 # redirect stderr so we can display the errors
 # when the ERR trap is called
@@ -548,13 +547,12 @@ _parse_choice_action() {
 	if [ "$action" = "function" ]; then
 		local func="${splitted[1]}"
 		shift splitted
-		typeset -f "${func}" >/dev/null && {
-			debug_msg "Calling: $func ${splitted}"
-			$func "${splitted}" && return 0 || return 0
-		} || {
+		typeset -f "${func}" >/dev/null || {
 			error_msg "ERROR: Function not found: $func."
 			return 0
 		}
+		debug_msg "Calling: $func ${splitted}"
+		$func "${splitted}"
 	else
 		error_msg "Unknown action '${action}' defined."
 	fi
@@ -1284,7 +1282,6 @@ _draw_checkboxes() {
 		# handle input events for the button box
 		_handle_button_event $checkboxes_buttons_key
 
-
 		case $input_event[key] in
 			q)
 				# TODO: handle gobally
@@ -1479,25 +1476,25 @@ err_trap() {
 
 
 exit_trap() {
-	trap - ERR EXIT QUIT INT TERM
 	zcurses end
 	reset
-
+	trap - EXIT INT
 	test -f $error_log_file && cat $error_log_file
 	test -f $stdout_file && cat $stdout_file
+	test -f $stderr_file && cat $stderr_file
 
 	test -f $stdout_file && rm -f $stdout_file
 	test -f $stderr_file && rm -f $stderr_file
 	test -f $error_log_file && rm -f $error_log_file
 
 	[ $has_err != false ] && {
-		return 1
+		exit 1
 	}
-	return 0
+	exit 0
 }
-setopt PIPEFAIL
-trap 'err_trap "$0" "$LINENO"' ERR
-trap 'exit_trap; return $?'    EXIT QUIT INT TERM
+setopt PIPEFAIL ERR_EXIT
+trap 'err_trap "$0" "$LINENO"' ERR ZERR
+trap 'exit_trap;'              EXIT QUIT INT TERM
 
 #   _   _
 #  | |_| |__   ___ _ __ ___   ___
