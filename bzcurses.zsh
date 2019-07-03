@@ -1688,7 +1688,9 @@ _handle_resize() {
 
 	debug_msg "resized ..."
 }
-trap _handle_resize WINCH
+# this trap is no longer needed since it will be called
+# by the local traps.
+#trap _handle_resize WINCH
 
 
 # set the postion array for stdscr so we know
