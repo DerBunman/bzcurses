@@ -26,12 +26,11 @@ tailbox_demo() {
 	
 	# this command lists all man pages and redirects
 	# stdout and stderr into the named pipe /tmp/fifo.$$
-	apropos . 1>/tmp/fifo.$$ 2>&1 &|
+	apropos . | head -n 150 1>/tmp/fifo.$$ 2>&1 &|
 
 	_draw_tailbox /tmp/fifo.$$ "Installed man pages"
 }
 
-#  
 #    ___ _ __ _ __ ___  _ __   ___  ___  _   _ ___
 #   / _ \ '__| '__/ _ \| '_ \ / _ \/ _ \| | | / __|
 #  |  __/ |  | | | (_) | | | |  __/ (_) | |_| \__ \

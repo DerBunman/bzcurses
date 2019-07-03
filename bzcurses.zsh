@@ -578,6 +578,7 @@ _parse_choice_action() {
 #  | (__| | | | (_) | | (_|  __/\__ \
 #   \___|_| |_|\___/|_|\___\___||___/
 _draw_choices() {
+	#setopt local_options LOCAL_TRAPS
 	typeset -A choice_actions
 	local choice_actions=( ${(kv)${(P)$(echo ${1}_choice_actions)}} )
 	local choice_active_key="${1}_choice_active"
@@ -1424,12 +1425,22 @@ _draw_tailbox() {
 		echo "ERROR: '$1' is not a named pipe" 1>&2
 		false
 	fi
-	# add tailbox window
-	zcurses addwin tailbox \
-		$max_window_size[height] $max_window_size[width] \
-		$stdscr_position[offset_y] $stdscr_position[offset_x] \
-		stdscr
-	_set_position_array tailbox border
+
+	_draw_tailbox_windows() {
+		[ "$zcurses_windows[(r)tailbox]" != "" ] && zcurses delwin tailbox;
+		# add tailbox window
+		zcurses addwin tailbox \
+			$max_window_size[height] $max_window_size[width] \
+			$stdscr_position[offset_y] $stdscr_position[offset_x] \
+			stdscr
+		_set_position_array tailbox border
+	}
+	_draw_tailbox_windows
+
+	trap '
+	_handle_resize
+	_draw_tailbox_windows
+	' WINCH
 
 	# cleanup windows on exit
 	trap '
@@ -1495,8 +1506,10 @@ _draw_tailbox() {
 
 	# wait for user input and close the tailbox
 	# if any key is pressed.
+	debug_msg "zcurses timeout stdscr $input_timeout_stdscr"
+	zcurses timeout stdscr $input_timeout_stdscr
 	while true; do
-		zcurses input stdscr raw key mouse
+		zcurses input stdscr raw key mouse || continue
 		# ignore mouse events
 		[ "$mouse" = "" ] && break
 	done
@@ -1555,7 +1568,7 @@ err_trap() {
 }
 
 exit_trap() {
-	trap - EXIT INT
+	trap - INT
 
 	test -f $error_log_file && cat $error_log_file
 
