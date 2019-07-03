@@ -80,6 +80,11 @@ button_postfix=" "
 #  |___/\__\__,_|___/\___|_|
 title_stdscr="${title_stdscr:-bzcurses}"
 
+# defines how long an input command should wait for input
+# at the moment this is only used to resize if the
+# terminal geometry has changed
+input_timeout_stdscr=5000
+
 #   _           _   _
 #  | |__  _   _| |_| |_ ___  _ __  ___
 #  | '_ \| | | | __| __/ _ \| '_ \/ __|
@@ -509,15 +514,15 @@ debug_msg() {
 				# scroll
 				zcurses scroll debug +1
 				# overwrite the bottom border so it won't bleed into the previous msg
-				zcurses move debug $(( ${debug_size[height]} -1)) 1
-				zcurses string debug "${(r:${debug_size[width]}:: :)${}}"
+				zcurses move debug $(( ${debug_position[height]} )) 1
+				zcurses string debug "${(r:${debug_position[width]}:: :)${}}"
 				
-				zcurses move debug $(( ${debug_size[height]} -1)) 1
-				if [ $debug_size[width] -lt $(( ${#row}  )) ]; then
+				zcurses move debug $(( ${debug_position[height]} )) 1
+				if [ $debug_position[width] -lt $(( ${#row}  )) ]; then
 					# display error msg
-					zcurses string debug "${row[1,$(( $debug_size[width] -1 ))]}"
+					zcurses string debug "${row[1,$(( $debug_position[width] -1 ))]}"
 
-					row="${${row[$(( $debug_size[width] -1 )),${#row}]}## }"
+					row="${${row[$(( $debug_position[width] -1 )),${#row}]}## }"
 				else
 					zcurses string debug "${row}"
 					row=""
@@ -599,30 +604,44 @@ _draw_choices() {
 		let ${choice_active_key}=1
 	fi
 
-	zcurses addwin choices \
-		$max_window_size[height] $max_window_size[width] \
-		$stdscr_position[offset_y] $stdscr_position[offset_x] \
-		stdscr
-	_set_position_array choices border
+	# I put the drawing/redrawing of the current windows in this
+	# function so it can also be called by the WINCH trap
+	_draw_choices_windows() {
+		[ "$zcurses_windows[(r)choices_buttons]" != "" ] && zcurses delwin choices_buttons;
+		[ "$zcurses_windows[(r)choices_choices]" != "" ] && zcurses delwin choices_choices;
+		[ "$zcurses_windows[(r)choices]" != "" ] && zcurses delwin choices;
 
-	local choices_text_height=3
-	local choices_buttons_height=1
+		zcurses addwin choices \
+			$max_window_size[height] $max_window_size[width] \
+			$stdscr_position[offset_y] $stdscr_position[offset_x] \
+			stdscr
+		_set_position_array choices border
 
-	zcurses addwin choices_buttons \
-		1 \
-		$choices_position[width] \
-		$(( $choices_position[height] + $choices_position[stdscr_offset_y] - $choices_buttons_height )) \
-		$choices_position[stdscr_offset_x] \
-		choices
-	_set_position_array choices_buttons
+		local choices_text_height=3
+		local choices_buttons_height=1
 
-	zcurses addwin choices_choices \
-		$(( $choices_position[height] -$choices_buttons_position[height] - $choices_text_height )) \
-		${choices_position[width]} \
-		$(( $choices_position[stdscr_offset_y] + $choices_text_height )) \
-		$choices_position[stdscr_offset_x] \
-		choices
-	_set_position_array choices_choices border
+		zcurses addwin choices_buttons \
+			1 \
+			$choices_position[width] \
+			$(( $choices_position[height] + $choices_position[stdscr_offset_y] - $choices_buttons_height )) \
+			$choices_position[stdscr_offset_x] \
+			choices
+		_set_position_array choices_buttons
+
+		zcurses addwin choices_choices \
+			$(( $choices_position[height] -$choices_buttons_position[height] - $choices_text_height )) \
+			${choices_position[width]} \
+			$(( $choices_position[stdscr_offset_y] + $choices_text_height )) \
+			$choices_position[stdscr_offset_x] \
+			choices
+		_set_position_array choices_choices border
+	}
+	_draw_choices_windows
+
+	trap '
+	_handle_resize
+	_draw_choices_windows
+	' WINCH
 
 	# cleanup windows on exit
 	trap '
@@ -718,8 +737,12 @@ _draw_choices() {
 		# redraw choices window with our changes
 		zcurses refresh choices
 
-		# evaluate input
-		zcurses input stdscr raw key mouse
+		# set timeout for stdscr to $input_timeout_stdscr
+		zcurses timeout stdscr $input_timeout_stdscr
+		# input returns false when aborted by timeout.
+		# we use the timeout to react to terminal resizing.
+		zcurses input stdscr raw key mouse || continue
+
 		_parse_input_event "$raw" "$key" "$mouse"
 		if [ ${(P)#$(echo ${1}_choices_buttons)[@]} -gt 0 ]; then
 			_handle_button_event ${1}_choices_buttons
@@ -847,31 +870,45 @@ _draw_textbox() {
 
 	debug_msg "drawing TEXTBOX for $1: '$2'"
 
-	# add textbox window
-	zcurses addwin textbox \
-		$max_window_size[height] $max_window_size[width] \
-		$stdscr_position[offset_y] $stdscr_position[offset_x] \
-		stdscr
-	_set_position_array textbox border
+	# I put the drawing/redrawing of the current windows in this
+	# function so it can also be called by the WINCH trap
+	_draw_textbox_windows() {
+		[ "$zcurses_windows[(r)textbox_buttons]" != "" ] && zcurses delwin textbox_buttons;
+		[ "$zcurses_windows[(r)textbox_text]" != "" ]    && zcurses delwin textbox_text;
+		[ "$zcurses_windows[(r)textbox]" != "" ]         && zcurses delwin textbox;
 
-	# add textbox window
-	local textbox_buttons_height=1
-	zcurses addwin textbox_buttons \
-		$textbox_buttons_height \
-		$textbox_position[width] \
-		$(( $textbox_position[height] + $textbox_position[stdscr_offset_y] - $textbox_position[offset_y] )) \
-		$textbox_position[stdscr_offset_x] \
-		textbox
-	_set_position_array textbox_buttons
+		# add textbox window
+		zcurses addwin textbox \
+			$max_window_size[height] $max_window_size[width] \
+			$stdscr_position[offset_y] $stdscr_position[offset_x] \
+			stdscr
+		_set_position_array textbox border
 
-	# textbox text area
-	zcurses addwin textbox_text \
-		$(( $textbox_position[height] - $textbox_buttons_height )) \
-		$textbox_position[width] \
-		$textbox_position[stdscr_offset_y] \
-		$textbox_position[stdscr_offset_x] \
-		textbox
-	_set_position_array textbox_text border
+		# add textbox window
+		local textbox_buttons_height=1
+		zcurses addwin textbox_buttons \
+			$textbox_buttons_height \
+			$textbox_position[width] \
+			$(( $textbox_position[height] + $textbox_position[stdscr_offset_y] - $textbox_position[offset_y] )) \
+			$textbox_position[stdscr_offset_x] \
+			textbox
+		_set_position_array textbox_buttons
+
+		# textbox text area
+		zcurses addwin textbox_text \
+			$(( $textbox_position[height] - $textbox_buttons_height )) \
+			$textbox_position[width] \
+			$textbox_position[stdscr_offset_y] \
+			$textbox_position[stdscr_offset_x] \
+			textbox
+		_set_position_array textbox_text border
+	}
+	_draw_textbox_windows
+
+	trap '
+	_handle_resize
+	_draw_textbox_windows
+	' WINCH
 
 	# cleanup windows on exit
 	trap '
@@ -879,23 +916,6 @@ _draw_textbox() {
 	zcurses delwin textbox_buttons;
 	zcurses delwin textbox;
 	' EXIT
-
-	# iterate over $2 and validate line length
-	if [ ${#textbox_current_text[@]} -eq 0 ]; then
-		local tmp=( ${(@f)3} )
-		for row in $tmp; do
-			while [ ${#row} -gt 0 ]; do
-				if [ $textbox_text_position[width] -lt ${#row} ]; then
-					debug_msg "INFO: Textbox row is too long, wrapping. ${#row} (max=$textbox_text_position[width])"
-					textbox_current_text+=( "${row[1,$textbox_text_position[width]]}" ) # -1 = optical space
-					row="${${row[$textbox_text_position[width],${#row}]}## }"
-				else
-					textbox_current_text+=( "${row}" )
-					row=""
-				fi
-			done
-		done
-	fi
 
 	# red background if title = Error
 	if [ "$1" = "error" ]; then
@@ -908,6 +928,23 @@ _draw_textbox() {
 
 	# textbox main loop
 	while true; do
+		# validate the line length
+        # TODO: only run when needed, eg: when started or resized
+		local tmp=( ${(@f)3} )
+		textbox_current_text=()
+		for row in $tmp; do
+			while [ ${#row} -gt 0 ]; do
+				if [ $textbox_text_position[width] -lt ${#row} ]; then
+					debug_msg "INFO: Textbox row is too long, wrapping. ${#row} (max=$textbox_text_position[width])"
+					textbox_current_text+=( "${row[1,$textbox_text_position[width]]}" ) # -1 = optical space
+					row="${${row[$textbox_text_position[width],${#row}]}## }"
+				else
+					textbox_current_text+=( "${row}" )
+					row=""
+				fi
+			done
+		done
+
 		# clear area containing textbox window
 		zcurses clear textbox
 		zcurses clear textbox_text
@@ -969,7 +1006,8 @@ _draw_textbox() {
 		zcurses refresh textbox
 
 		# wait for user input
-		zcurses input stdscr raw key mouse
+		zcurses timeout stdscr $input_timeout_stdscr
+		zcurses input stdscr raw key mouse || continue
 		_parse_input_event "$raw" "$key" "$mouse"
 		
 		# handle input events for the button box
@@ -1137,35 +1175,48 @@ _draw_checkboxes() {
 		local checkbox_unchecked_chars=${radio_unchecked_chars}
 	fi
 
-	# height of the textarea above the checkboxes
-	local checkboxes_text_height=3
-	# height of the button window.
-	local checkboxes_buttons_height=1
+	# I put the drawing/redrawing of the current windows in this
+	# function so it can also be called by the WINCH trap
+	_draw_checkboxes_windows() {
+		[ "$zcurses_windows[(r)checkboxes_buttons]" != "" ]    && zcurses delwin checkboxes_buttons;
+		[ "$zcurses_windows[(r)checkboxes_checkboxes]" != "" ] && zcurses delwin checkboxes_checkboxes;
+		[ "$zcurses_windows[(r)checkboxes]" != "" ]            && zcurses delwin checkboxes;
+		# height of the textarea above the checkboxes
+		local checkboxes_text_height=3
+		# height of the button window.
+		local checkboxes_buttons_height=1
 
-	# main checkboxes window
-	zcurses addwin checkboxes \
-		$max_window_size[height] $max_window_size[width] \
-		$stdscr_position[offset_y] $stdscr_position[offset_x] \
-		stdscr
-	_set_position_array checkboxes border
+		# main checkboxes window
+		zcurses addwin checkboxes \
+			$max_window_size[height] $max_window_size[width] \
+			$stdscr_position[offset_y] $stdscr_position[offset_x] \
+			stdscr
+		_set_position_array checkboxes border
 
-	# control buttons for the checkboxes
-	zcurses addwin checkboxes_buttons \
-		1 \
-		$checkboxes_position[width] \
-		$(( $checkboxes_position[height] + $checkboxes_position[stdscr_offset_y] - $checkboxes_buttons_height )) \
-		$checkboxes_position[stdscr_offset_x] \
-		checkboxes
-	_set_position_array checkboxes_buttons
+		# control buttons for the checkboxes
+		zcurses addwin checkboxes_buttons \
+			1 \
+			$checkboxes_position[width] \
+			$(( $checkboxes_position[height] + $checkboxes_position[stdscr_offset_y] - $checkboxes_buttons_height )) \
+			$checkboxes_position[stdscr_offset_x] \
+			checkboxes
+		_set_position_array checkboxes_buttons
 
-	# the checkboxes window
-	zcurses addwin checkboxes_checkboxes \
-		$(( $checkboxes_position[height] -$checkboxes_buttons_position[height] - $checkboxes_text_height )) \
-		${checkboxes_position[width]} \
-		$(( $checkboxes_position[stdscr_offset_y] + $checkboxes_text_height )) \
-		$checkboxes_position[stdscr_offset_x] \
-		checkboxes
-	_set_position_array checkboxes_checkboxes border
+		# the checkboxes window
+		zcurses addwin checkboxes_checkboxes \
+			$(( $checkboxes_position[height] -$checkboxes_buttons_position[height] - $checkboxes_text_height )) \
+			${checkboxes_position[width]} \
+			$(( $checkboxes_position[stdscr_offset_y] + $checkboxes_text_height )) \
+			$checkboxes_position[stdscr_offset_x] \
+			checkboxes
+		_set_position_array checkboxes_checkboxes border
+	}
+	_draw_checkboxes_windows
+
+	trap '
+	_handle_resize
+	_draw_checkboxes_windows
+	' WINCH
 
 	# cleanup windows on exit
 	trap '
@@ -1281,7 +1332,8 @@ _draw_checkboxes() {
 		zcurses refresh checkboxes
 
 		# wait for user input
-		zcurses input stdscr raw key mouse
+		zcurses timeout stdscr $input_timeout_stdscr
+		zcurses input stdscr raw key mouse || continue
 		# parses the input event into the global array input_event
 		_parse_input_event "$raw" "$key" "$mouse"
 
@@ -1505,6 +1557,7 @@ err_trap() {
 
 exit_trap() {
 	trap - EXIT INT
+
 	test -f $error_log_file && cat $error_log_file
 
 	test -f $stderr_file && rm -f $stderr_file
@@ -1512,7 +1565,7 @@ exit_trap() {
 
 }
 trap 'err_trap "$0" "$LINENO";'       ERR ZERR
-trap 'zcurses end; reset; exit_trap;' EXIT INT
+trap 'zcurses end; reset; exit_trap "$0" "$LINENO";' EXIT INT
 
 #   _   _
 #  | |_| |__   ___ _ __ ___   ___
@@ -1556,6 +1609,7 @@ fi
 #  | (_| |  __/ (_) | | | | | |  __/ |_| |  | |_| |
 #   \__, |\___|\___/|_| |_| |_|\___|\__|_|   \__, |
 #   |___/                                    |___/
+typeset -A max_window_size
 _calculate_terminal_space() {
 	if [[ $LINES -lt 24 || $COLUMNS -lt 80 ]]; then
 		echo "ERROR, your terminal is to small." 1>&2
@@ -1578,6 +1632,13 @@ _calculate_terminal_space() {
 			false # trigger ERR trap
 		fi
 	fi
+
+	# the maximum size should leave a one char gap around
+	# the maximum sized window plus one line for the titlebar
+	max_window_size=(
+		height $(( $height -2 ))
+		width  $(( $width -2 ))
+	)
 }
 _calculate_terminal_space
 
@@ -1587,35 +1648,53 @@ _calculate_terminal_space
 #  | (_| |  __/ |_) | |_| | (_| |  \ V  V /| | | | | (_| | (_) \ V  V /
 #   \__,_|\___|_.__/ \__,_|\__, |   \_/\_/ |_|_| |_|\__,_|\___/ \_/\_/
 #                          |___/
-if [ $debug = true ]; then
-	zcurses addwin debug \
-		$(( $LINES - $height )) $(( $COLUMNS -2 )) \
-		$height 1 \
-		stdscr
-
-	typeset -A debug_size
-	debug_size=(
-		height $(( $LINES - $height -1 ))
-		width  $(( $COLUMNS -2 ))
-	)
-
-	debug_msg "debug mode active"
-else
+if [ $debug = false ]; then
 	# overwrite function
 	debug_msg() {}
 fi
+_draw_debug_window() {
+	if [ $debug = true ]; then
+		[ "${zcurses_windows[(r)debug]}" = "debug" ] \
+			&& zcurses delwin debug
+		zcurses addwin debug \
+			$(( $LINES - $height )) $(( $COLUMNS -2 )) \
+			$height 1 \
+			stdscr
+		_set_position_array debug border
+	fi
+}
+_draw_debug_window
+
+#                 _     _
+#   _ __ ___  ___(_)___(_)_ __   __ _
+#  | '__/ _ \/ __| |_  / | '_ \ / _` |
+#  | | |  __/\__ \ |/ /| | | | | (_| |
+#  |_|  \___||___/_/___|_|_| |_|\__, |
+#                               |___/
+_handle_resize() {
+	# recalculate the sizes
+	_calculate_terminal_space
+
+	# resize stdscr to new terminal size
+	zcurses resize $height $width endwin
+	zcurses refresh
+	_set_position_array stdscr border
+
+	# redraw debug window
+	_draw_debug_window
+
+	# redraw stdscr
+	_draw_stdscr
+
+	debug_msg "resized ..."
+}
+trap _handle_resize WINCH
+
 
 # set the postion array for stdscr so we know
 # the size of our terminal
 _set_position_array stdscr border
 
-# the maximum size should leave a one char gap around
-# the maximum sized window plus one line for the titlebar
-typeset -A max_window_size
-max_window_size=(
-	height $(( $height -2 ))
-	width  $(( $width -2 ))
-)
 
 #       _      _                 _   _ _   _                        _
 #   ___| |_ __| |___  ___ _ __  | |_(_) |_| | ___    __ _ _ __   __| |

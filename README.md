@@ -16,7 +16,7 @@ Work in progress. Everything may change but I'll try to keep everything compatib
 	* error messages
 	* tailbox (reads and displays a named pipe)
 * debug mode toggleable via debug=true
-* scales to terminal size (only on startup)
+* scales to terminal size
 * themes (colors, pre/postfixes, icons)
 * incomplete mouse input:
 	* scrolling works
@@ -24,7 +24,6 @@ Work in progress. Everything may change but I'll try to keep everything compatib
 
 ### TODO
 
-* handle terminal resize somehow
 * add function to validate all the dialog definitions
 * handle mouse clicks
 * dialogs
