@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-setopt PIPEFAIL ERR_EXIT
+setopt PIPEFAIL ERR_RETURN
 debug=${debug:-false}
 
 # redirect stderr so we can display the errors
@@ -1554,7 +1554,6 @@ err_trap() {
 	kill -INT $$
 }
 
-
 exit_trap() {
 	trap - EXIT INT
 
@@ -1564,8 +1563,8 @@ exit_trap() {
 	test -f $error_log_file && rm -f $error_log_file
 
 }
-trap 'err_trap "$0" "$LINENO";'       ERR ZERR
-trap 'zcurses end; reset; exit_trap "$0" "$LINENO";' EXIT INT
+trap 'err_trap "$0" "$LINENO";'       ZERR ERR
+trap 'zcurses end; reset; exit_trap;' EXIT INT
 
 #   _   _
 #  | |_| |__   ___ _ __ ___   ___
@@ -1717,3 +1716,5 @@ _draw_stdscr() {
 	zcurses refresh stdscr
 }
 _draw_stdscr
+
+debug_msg "Debug mode active ..."
