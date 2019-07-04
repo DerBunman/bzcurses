@@ -1609,7 +1609,7 @@ zcurses init
 # set traps to auto cleanup and display errors
 has_err=false
 error_log_file=$(mktemp -t bzcurses.error_log.$$.XXXXX)
-err_trap() {
+trap_err() {
 	signal=$?
 	trap - EXIT INT TERM ERR ZERR
 
@@ -1650,12 +1650,12 @@ trap_cleanup_handler() {
 
 trap '
 	trap - EXIT INT TERM ERR ZERR
-	zcurses end
+	trap_cleanup_handler
 	echo "Received SIGINT. Aborting script."
 	kill -INT -$$
 ' INT
 trap trap_cleanup_handler       TERM EXIT
-trap 'err_trap "$0" "$LINENO";' ZERR ERR
+trap 'trap_err "$0" "$LINENO";' ZERR ERR
 
 #   _   _
 #  | |_| |__   ___ _ __ ___   ___
