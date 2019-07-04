@@ -88,7 +88,7 @@ title_stdscr="${title_stdscr:-bzcurses}"
 # defines how long an input command should wait for input
 # at the moment this is only used to resize if the
 # terminal geometry has changed
-input_timeout_stdscr=5000
+input_timeout_stdscr=1500
 
 #   _           _   _
 #  | |__  _   _| |_| |_ ___  _ __  ___
@@ -797,8 +797,8 @@ _draw_choices() {
 #									throw "$CATCH"
 #									#return $retval
 								elif [ $retval -ne 0 ]; then
-									error_msg "Error $retval in $0 returned. Script will abort."
-									exit $retval
+									#error_msg "Error $retval in $0 returned. Script will abort.
+									return $retval
 								fi
 							}
 						}
@@ -1611,8 +1611,9 @@ has_err=false
 error_log_file=$(mktemp -t bzcurses.error_log.$$.XXXXX)
 trap_err() {
 	signal=$?
-	trap - EXIT INT TERM ERR ZERR
-
+	setopt LOCAL_OPTIONS
+	unsetopt LOCAL_TRAPS
+	#trap - EXIT TERM ERR ZERR
 	{
 		echo "============================================"
 		echo "Error $signal in file $funcfiletrace[1] ($functrace[1])":
@@ -1626,16 +1627,17 @@ trap_err() {
 		echo "--------------------------------------------"
 		echo ""
 	} >> $error_log_file
-	has_err=true
-	trap 'trap_cleanup_handler;' INT
+	trap 'trap_cleanup_handler; return $?' INT
 	kill -INT $$
 }
 
 trap_cleanup_handler() {
 	signal=$?
+	setopt LOCAL_OPTIONS
+	unsetopt LOCAL_TRAPS
 	trap - EXIT INT TERM ERR ZERR
 
-	zcurses end
+	zcurses end; reset
 
 	test -f $error_log_file && cat $error_log_file
 
@@ -1645,7 +1647,7 @@ trap_cleanup_handler() {
 	test -f $stderr_file && rm -f $stderr_file
 	test -f $error_log_file && rm -f $error_log_file
 
-	[ $signal -ne 0 ] && return $?
+	return $signal
 }
 
 trap '
@@ -1654,7 +1656,11 @@ trap '
 	echo "Received SIGINT. Aborting script."
 	kill -INT -$$
 ' INT
-trap trap_cleanup_handler       TERM EXIT
+
+# shouldn't return anything, because it is called
+# when the script ends. but we want to be able to 
+# run other schripts after that.
+trap 'trap_cleanup_handler;'    TERM EXIT
 trap 'trap_err "$0" "$LINENO";' ZERR ERR
 
 #   _   _

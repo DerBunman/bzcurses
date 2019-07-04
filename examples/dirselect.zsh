@@ -8,13 +8,10 @@ fi
 
 title_stdscr="dirselect example"
 
-trap 'echo $0 $LINENO;' INT TERM
-
 # the _checkboxes is an associative array that defines
 # the name and the title of the checkboxes
 typeset -A dirselect_checkboxes
 dirselect_checkbox_order=()
-dirpath=
 
 for dir in ${1}/**/*(/); do
 	# since associative arrays in zsh are unordered and
