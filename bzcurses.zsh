@@ -1,5 +1,9 @@
 #!/usr/bin/env zsh
-setopt PIPEFAIL ERR_RETURN
+setopt LOCAL_TRAPS ERR_EXIT
+autoload throw catch
+
+# cleanup_commands=()
+
 debug=${debug:-false}
 
 # redirect stderr so we can display the errors
@@ -93,8 +97,7 @@ input_timeout_stdscr=5000
 
 # default actions if there is nothing defined
 buttons_actions.exit() {
-	yesno_exit && return 100
-	[ $? -eq 1 ] && exit
+	yesno_exit
 }
 
 #        _           _
@@ -260,8 +263,7 @@ yesno_textbox_buttons_actions.no() {
 #   |___/                    |_____|
 yesno_exit() {
 	debug_msg "YESNO EXIT: drawing dialog"
-	_draw_yesno "Confirm exit" "Are you sure, that you want to exit?" || return 0
-	[ $? -eq 0 ] && exit
+	_draw_yesno "Confirm exit" "Are you sure, that you want to exit?" && exit || :
 }
 
 
@@ -555,6 +557,7 @@ _parse_choice_action() {
 			return 0
 		}
 		debug_msg "Calling: $func ${splitted}"
+		setopt LOCAL_OPTIONS ERR_RETURN
 		"$func" "${splitted[@]}"
 
 	elif [ "$action" = "command" ]; then
@@ -566,6 +569,10 @@ _parse_choice_action() {
 			"$cmd" "${splitted[@]}"
 
 		fi
+
+	elif [ "$action" = "exception" ]; then
+		throw "${splitted[1]:-you_didnt_provide_an_exception_name}"
+
 	else
 		error_msg "Unknown action '${action}' defined."
 	fi
@@ -644,14 +651,13 @@ _draw_choices() {
 	_draw_choices_windows
 	' WINCH
 
-	# cleanup windows on exit
 	trap '
-	zcurses clear choices_buttons;
-	zcurses clear choices_choices;
-	zcurses clear choices;
-	zcurses delwin choices_buttons;
-	zcurses delwin choices_choices;
-	zcurses delwin choices;
+		zcurses clear choices_buttons;
+		zcurses clear choices_choices;
+		zcurses clear choices;
+		zcurses delwin choices_buttons;
+		zcurses delwin choices_choices;
+		zcurses delwin choices;
 	' EXIT
 
 	while true; do
@@ -766,20 +772,46 @@ _draw_choices() {
 					if [ "$action" = "undefined" ]; then
 						error_msg \
 							"There is no action defined for choice ${choice_order[${(P)${choice_active_key}}]}."
-						return 0
 					else
-						_parse_choice_action "${action}"
-						return
+						action_cmd="continue"
+						function() {
+							setopt LOCAL_OPTIONS #LOCAL_TRAPS #ERR_RETURN
+							unsetopt ERR_EXIT
+							#trap - ERR
+							{
+								_parse_choice_action "${action}"
+
+							} always {
+								retval=$?
+								trap 'trap_cleanup_handler; return $?' ERR
+								setopt ERR_EXIT
+								if catch close_dialog; then
+									TRY_BLOCK_ERROR=0
+									debug_msg "close_dialog called."
+									action_cmd="break"
+#								elif catch ''; then
+#									# TODO: validate that this works
+#									error_msg "Caught a shell error.  Propagating..."
+#									throw ''
+#									#return $retval
+#								elif catch *; then
+#									error_msg "Caught exception $CATCH"
+#									throw "$CATCH"
+#									#return $retval
+								elif [ $retval -ne 0 ]; then
+									error_msg "Error $retval in $0 returned. Script will abort."
+									exit $retval
+								fi
+							}
+						}
+						#debug_msg "$(trap) $(setopt)"
+						eval "${action_cmd}"
+
 					fi
 				elif [ "$button_function" != "" ]; then
 					# if there is a button function defined call and handle it
 					debug_msg "Button Function: $1::$button_value::$button_function"
-					$button_function && {
-						local retval=$?
-					} || {
-						local retval=$?
-					}
-					[ $retval -ne 100 ] && return $retval
+					$button_function
 				else
 					# if there is no button_function defined we continue
 					# shown an error_msg and continue
@@ -1106,10 +1138,11 @@ _draw_checkboxes() {
 			errors+=$'\n'
 		fi
 
-		if [ "${(t)${(P)checkboxes_buttons_key}}" != "association" ]; then
-			errors+="-> The variable ${checkboxes_buttons_key} is not set or no associative array."
-			errors+=$'\n'
-		fi
+		# TODO check only if set
+		#if [ "${(t)${(P)checkboxes_buttons_key}}" != "association" ]; then
+		#	errors+="-> The variable ${checkboxes_buttons_key} is not set or no associative array."
+		#	errors+=$'\n'
+		#fi
 
 		if [ "${(t)${(P)checkboxes_buttons_order_key}}" != "array" ]; then
 			errors+="-> The variable ${checkboxes_buttons_order_key} is not set or no array."
@@ -1426,6 +1459,8 @@ _draw_tailbox() {
 		false
 	fi
 
+	# I put the drawing/redrawing of the current windows in this
+	# function so it can also be called by the WINCH trap
 	_draw_tailbox_windows() {
 		[ "$zcurses_windows[(r)tailbox]" != "" ] && zcurses delwin tailbox;
 		# add tailbox window
@@ -1515,6 +1550,12 @@ _draw_tailbox() {
 	done
 }
 
+#                                     _ _ _
+#        _ __ _   _ _ __      ___  __| (_) |_ ___  _ __
+#       | '__| | | | '_ \    / _ \/ _` | | __/ _ \| '__|
+#       | |  | |_| | | | |  |  __/ (_| | | || (_) | |
+#   ____|_|   \__,_|_| |_|___\___|\__,_|_|\__\___/|_|
+#  |_____|              |_____|
 # _run_editor $file [$line]
 _run_editor() {
 	editor=${EDITOR:-nano}
@@ -1529,7 +1570,7 @@ _run_editor() {
 	fi
 	# this will redraw all windows after beeing
 	# messed up by something that wrote to stdout
-	_draw_stdscr 
+	_draw_stdscr
 }
 
 #   _       _ _   _       _ _
@@ -1550,9 +1591,12 @@ zcurses init
 has_err=false
 error_log_file=$(mktemp -t bzcurses.error_log.$$.XXXXX)
 err_trap() {
+	signal=$?
+	trap - EXIT INT TERM ERR ZERR
+
 	{
 		echo "============================================"
-		echo "Error in file $funcfiletrace[1] ($functrace[1])":
+		echo "Error $signal in file $funcfiletrace[1] ($functrace[1])":
 		echo "$(cat $stderr_file && echo >$stderr_file)"
 		echo ""
 		echo "TRACE:"
@@ -1564,20 +1608,32 @@ err_trap() {
 		echo ""
 	} >> $error_log_file
 	has_err=true
+	trap 'trap_cleanup_handler;' INT
 	kill -INT $$
 }
 
-exit_trap() {
-	trap - INT
+trap_cleanup_handler() {
+	signal=$?
+	trap - EXIT INT TERM ERR ZERR
+
+	zcurses end
 
 	test -f $error_log_file && cat $error_log_file
 
 	test -f $stderr_file && rm -f $stderr_file
 	test -f $error_log_file && rm -f $error_log_file
 
+	return $?
 }
-trap 'err_trap "$0" "$LINENO";'       ZERR ERR
-trap 'zcurses end; reset; exit_trap;' EXIT INT
+
+trap '
+	trap - EXIT INT TERM ERR ZERR
+	zcurses end
+	echo "Received SIGINT. Aborting script."
+	kill -INT -$$
+' INT
+trap 'trap_cleanup_handler; return $?' TERM EXIT
+trap 'err_trap "$0" "$LINENO";'        ZERR ERR
 
 #   _   _
 #  | |_| |__   ___ _ __ ___   ___

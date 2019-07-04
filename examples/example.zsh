@@ -66,9 +66,10 @@ typeset -A main_choices=(
 	error     "Launches a function that has errors to test error handling."
 	tailbox   "Launch Tailbox demo."
 	editor    "Launches \$EDITOR."
+	close     "Close this dialog and proceed with script."
 )
 main_choice_order=(
-	blah fasel undefined unknown error tailbox editor
+	blah fasel undefined unknown error tailbox editor close
 )
 typeset -A main_choice_actions=(
 	blah      "function::_draw_checkboxes::blah"
@@ -78,6 +79,7 @@ typeset -A main_choice_actions=(
 	error     "function::erroneous"
 	tailbox   "function::tailbox_demo"
 	editor    "function::_run_editor::/etc/fstab::3"
+	close     "exception::close_dialog"
 )
 
 # overwrite the default button definitions
@@ -193,17 +195,25 @@ blah_checkboxes_buttons_active=1
 
 #--- END OF CONFIGURATION ---#
 
-# include and initialize bzcurses
-. ${0:h}/../bzcurses.zsh
+# wrapped in an anonymous function so we don't
+# pollute the rest of the script with our traps and stuff
+function() {
+	setopt LOCAL_OPTIONS
+	
+	# include and initialize bzcurses
+	. "$1"
 
-
-# draw the choices window from the main choices
-while true; do
+	# draw the choices window from the main choices
 	_draw_choices main
-done
 
-# everything redirected to fd3 will be displayed
-# after zcurses has ended
-#echo BLAH:  $blah_checkboxes_checked[@] 1>&3
-#echo FASEL: $fasel_checkboxes_checked[@] 1>&3
+	# if this trap is not reset the script will exit after this
+	# anonymous funtion ends
+	trap - EXIT
 
+	# cleanup screen
+	zcurses end
+	reset
+} "${0:h}/../bzcurses.zsh"
+
+echo BLAH:  $blah_checkboxes_checked
+echo FASEL: $fasel_checkboxes_checked
