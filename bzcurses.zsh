@@ -115,15 +115,36 @@ buttons_actions.exit() {
 typeset -A choices_buttons
 choices_buttons=(
 	ok     "SELECT"
-	close  "CLOSE"
+	exit   "EXIT"
 	help   "HELP"
 )
-choices_buttons_order=( "ok" "close" "help" )
+choices_buttons_order=( "ok" "exit" "help" )
 
-choices_buttons_actions.close() {
-	debug_msg "Close pressed. throwing close_dialog."
-	throw 'close_dialog'
+choices_buttons_actions.exit() {
+	debug_msg "Exit pressed. throwing exit_dialog."
+	yesno_exit
 }
+
+#choices_buttons_actions.ok() {
+#	debug_msg "Ok pressed."
+#	#return 100
+#}
+
+#       _       __             _ _
+#    __| | ___ / _| __ _ _   _| | |_
+#   / _` |/ _ \ |_ / _` | | | | | __|
+#  | (_| |  __/  _| (_| | |_| | | |_
+#   \__,_|\___|_|  \__,_|\__,_|_|\__|
+#   _           _   _
+#  | |__  _   _| |_| |_ ___  _ __  ___
+#  | '_ \| | | | __| __/ _ \| '_ \/ __|
+#  | |_) | |_| | |_| || (_) | | | \__ \
+#  |_.__/ \__,_|\__|\__\___/|_| |_|___/
+buttons_actions.ok() {
+	debug_msg "Ok pressed. Ending checkboxes dialog."
+	return 100
+}
+
 
 #        _               _    _
 #    ___| |__   ___  ___| | _| |__   _____  _____  ___
@@ -144,7 +165,7 @@ checkboxes_buttons_order=( "ok" )
 
 checkboxes_buttons_actions.ok() {
 	debug_msg "Ok pressed. Ending checkboxes dialog."
-	return
+	return 100
 }
 
 #   _            _   _
@@ -236,6 +257,10 @@ yesno_textbox_buttons_actions.no() {
 	return 1
 }
 
+typeset -A exit_code_actions=(
+	0   ":"
+	100 "break"
+)
 
 
 
@@ -398,17 +423,17 @@ _handle_button_event() {
 
 	case $input_event[key] in
 		LEFT)
-			if [ ${(P)active} -gt 1 ]; then
+			if [ ${(P)active:-1} -gt 1 ]; then
 				let $active=$(( $active -1 ))
 			fi
 			;;
 		RIGHT)
-			if [ ${(P)active} -lt ${(P)#order[@]} ]; then
+			if [ ${(P)active:-1} -lt ${(P)#order[@]} ]; then
 				let $active=$(( $active +1 ))
 			fi
 			;;
 		TAB)
-			if [ ${(P)active} -lt ${(P)#order[@]} ]; then
+			if [ ${(P)active:-1} -lt ${(P)#order[@]} ]; then
 				let $active=$(( $active +1 ))
 			else
 				let $active=1
@@ -571,6 +596,11 @@ _parse_choice_action() {
 
 		fi
 
+	elif [ "$action" = "return" ]; then
+		setopt LOCAL_OPTIONS
+		unsetopt ERR_EXIT ERR_RETURN
+		return ${splitted[1]:-0}
+
 	elif [ "$action" = "exception" ]; then
 		throw "${splitted[1]:-you_didnt_provide_an_exception_name}"
 
@@ -611,6 +641,17 @@ _draw_choices() {
 	if [ "${(P)choice_active_key}" = "" ]; then
 		let ${choice_active_key}=1
 	fi
+
+	if [[ "${(t)${(P)choices_buttons_key}}" != 'association' ]]; then
+		errors+="-> The variable ${choices_buttons_key} is not set or no associative array."
+		errors+=$'\n'
+	fi
+
+	if [ "${(t)${(P)choices_buttons_order_key}}" != "array" ]; then
+		errors+="-> The variable ${choices_buttons_order_key} is not set or no array."
+		errors+=$'\n'
+	fi
+
 
 	# I put the drawing/redrawing of the current windows in this
 	# function so it can also be called by the WINCH trap
@@ -754,7 +795,7 @@ _draw_choices() {
 		if [ ${(P)#$(echo ${1}_choices_buttons)[@]} -gt 0 ]; then
 			_handle_button_event ${1}_choices_buttons
 		else
-			_handle_button_event
+			_handle_button_event choices_buttons
 		fi
 		case "${input_event[key]}" in
 			q)
@@ -764,8 +805,11 @@ _draw_choices() {
 			CR)
 				local button_value=${${(P)${(P)$(echo choices_buttons_order_key)}[@]}[${(P)$(echo $choices_buttons_active_key)}]}
 				_set_button_function_name "choices" "$1" "$button_value"
-				if [[ $button_value = "ok" && $button_function = "" ]]; then
-					# if there is no function defined and the button is ok,
+				if [[ "$button_value" = "ok" && $button_function != "" ]]; then
+					debug_msg "There is an action for choices_button_actions.ok but it will be ignored."
+				fi
+				if [ "$button_value" = "ok" ]; then
+					# if the button is ok,
 					# we check for a action definition for this choice
 					local action="${choice_actions[${choice_order[${(P)${choice_active_key}}]}]:-undefined}"
 					debug_msg "INFO: Selected: ${choice_order[${(P)${choice_active_key}}]} Action: ${action}"
@@ -773,62 +817,29 @@ _draw_choices() {
 						error_msg \
 							"There is no action defined for choice ${choice_order[${(P)${choice_active_key}}]}."
 					else
-						action_cmd="continue"
-						function() {
-							setopt LOCAL_OPTIONS #LOCAL_TRAPS #ERR_RETURN
-							unsetopt ERR_EXIT
-							{
-								_parse_choice_action "${action}"
-
-							} always {
-								retval=$?
-								setopt ERR_EXIT
-								if catch close_dialog; then
-									TRY_BLOCK_ERROR=0
-									debug_msg "close_dialog called."
-									action_cmd="break"
-#								elif catch ''; then
-#									# TODO: validate that this works
-#									error_msg "Caught a shell error.  Propagating..."
-#									throw ''
-#									#return $retval
-#								elif catch *; then
-#									error_msg "Caught exception $CATCH"
-#									throw "$CATCH"
-#									#return $retval
-								elif [ $retval -ne 0 ]; then
-									#error_msg "Error $retval in $0 returned. Script will abort.
-									return $retval
-								fi
-							}
-						}
-						eval "${action_cmd}"
-
-					fi
-				elif [ "$button_function" != "" ]; then
-					# if there is a button function defined call and handle it
-					debug_msg "Button Function: $1::$button_value::$button_function"
-
-					action_cmd="continue"
-					function() {
-						setopt LOCAL_OPTIONS #LOCAL_TRAPS #ERR_RETURN
-						unsetopt ERR_EXIT
+						_parse_choice_action "${action}" && retval=$? || retval=$?
 						{
-							$button_function
-
-						} always {
-							retval=$?
-							setopt ERR_EXIT
-							if catch close_dialog; then
-								TRY_BLOCK_ERROR=0
-								action_cmd="break"
-							elif [ $retval -ne 0 ]; then
-								error_msg "Error $retval in $0 returned. Script will abort."
-								exit $retval
+							if [ ${#exit_code_actions[$retval]} -gt 0 ]; then
+								eval "${exit_code_actions[$retval]}"
+							else
+								return $retval
 							fi
 						}
+					fi
+				elif [ "$button_function" != "" ]; then
+					"$button_function" && retval=$? || retval=$?
+					{
+						retval=$?
+						if [ ${#exit_code_actions[$retval]} -gt 0 ]; then
+							eval "${exit_code_actions[$retval]}"
+						else
+							return $retval
+						fi
 					}
-					eval "${action_cmd}"
+					# if there is no button_function defined we continue
+					# because _set_button_function_name has already shown an error_msg
+					continue
+
 				else
 					# if there is no button_function defined we continue
 					# shown an error_msg and continue
@@ -1402,18 +1413,18 @@ _draw_checkboxes() {
 
 				_set_button_function_name "checkboxes" "$1" "$button_value"
 				if [ "$button_function" != "" ]; then
-					# TODO error handling
-					$button_function && {
-						local retval=$?
-					} || {
-						local retval=$?
+					"$button_function" && retval=$? || retval=$?
+					{
+						if [ ${#exit_code_actions[$retval]} -gt 0 ]; then
+							eval "${exit_code_actions[$retval]}"
+						else
+							return $retval
+						fi
 					}
-					[ $retval -ne 100 ] && return $retval
-				else
-					# if there is no button_function defined we continue
-					# because _set_button_function_name has already shown an error_msg
-					continue
 				fi
+				# if there is no button_function defined we continue
+				# because _set_button_function_name has already shown an error_msg
+				continue
 				;;
 			PRESSED4|UP)
 				if [ ${(P)$(echo ${1}_checkbox_active)} -gt 1 ]; then
