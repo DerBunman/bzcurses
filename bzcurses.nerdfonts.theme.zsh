@@ -64,6 +64,7 @@ button_icons+=(
 	"REFRESH"   "菱"
 	"YES"       " "
 	"NO"        " "
+	"CLOSE"     "淪"
 	"DELETE"    " "
 	"REMOVE"    " "
 	"UNDEFINED" " "

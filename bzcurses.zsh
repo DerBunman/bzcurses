@@ -115,14 +115,14 @@ buttons_actions.exit() {
 typeset -A choices_buttons
 choices_buttons=(
 	ok     "SELECT"
-	cancel "CANCEL"
+	close  "CLOSE"
 	help   "HELP"
 )
-choices_buttons_order=( "ok" "cancel" "help" )
+choices_buttons_order=( "ok" "close" "help" )
 
-choices_buttons_actions.cancel() {
-	debug_msg "Cancel pressed. Ending checkboxes dialog with error code 1."
-	return 1
+choices_buttons_actions.close() {
+	debug_msg "Close pressed. throwing close_dialog."
+	throw 'close_dialog'
 }
 
 #        _               _    _
@@ -586,7 +586,6 @@ _parse_choice_action() {
 #  | (__| | | | (_) | | (_|  __/\__ \
 #   \___|_| |_|\___/|_|\___\___||___/
 _draw_choices() {
-	#setopt local_options LOCAL_TRAPS
 	typeset -A choice_actions
 	local choice_actions=( ${(kv)${(P)$(echo ${1}_choice_actions)}} )
 	local choice_active_key="${1}_choice_active"
@@ -809,7 +808,27 @@ _draw_choices() {
 				elif [ "$button_function" != "" ]; then
 					# if there is a button function defined call and handle it
 					debug_msg "Button Function: $1::$button_value::$button_function"
-					$button_function
+
+					action_cmd="continue"
+					function() {
+						setopt LOCAL_OPTIONS #LOCAL_TRAPS #ERR_RETURN
+						unsetopt ERR_EXIT
+						{
+							$button_function
+
+						} always {
+							retval=$?
+							setopt ERR_EXIT
+							if catch close_dialog; then
+								TRY_BLOCK_ERROR=0
+								action_cmd="break"
+							elif [ $retval -ne 0 ]; then
+								error_msg "Error $retval in $0 returned. Script will abort."
+								exit $retval
+							fi
+						}
+					}
+					eval "${action_cmd}"
 				else
 					# if there is no button_function defined we continue
 					# shown an error_msg and continue

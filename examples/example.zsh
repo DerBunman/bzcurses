@@ -87,12 +87,13 @@ typeset -A main_choice_actions=(
 # when you forget to define a function for a button
 typeset -A main_choices_buttons=(
 	ok     "SELECT"
+	close  "CLOSE"
 	exit   "EXIT"
 	help   "HELP"
 	edit   "EDIT"
 	broken "BROKEN"
 )
-main_choices_buttons_order=( "ok" "exit" "help" "edit" "broken" )
+main_choices_buttons_order=( "ok" "close" "exit" "help" "edit" "broken" )
 main_choices_buttons_active=1
 
 

@@ -23,6 +23,7 @@ done 1>/tmp/fifo.$$ 2>&1 &|
 function(){
 	# include and initialize bzcurses
 	. "$1"
+
 	_draw_tailbox /tmp/fifo.$$ "Listing nice numbers."
 
 } "${0:h}/../bzcurses.zsh"
