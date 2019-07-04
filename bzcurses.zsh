@@ -799,8 +799,7 @@ _draw_choices() {
 		fi
 		case "${input_event[key]}" in
 			q)
-				# TODO: handle globally and add confirm dialog
-				exit
+				kill -TERM $$
 				;;
 			CR)
 				local button_value=${${(P)${(P)$(echo choices_buttons_order_key)}[@]}[${(P)$(echo $choices_buttons_active_key)}]}
@@ -1080,8 +1079,7 @@ _draw_textbox() {
 
 		case $input_event[key] in
 			q)
-				# TODO: handle gobally
-				return 1
+				kill -TERM $$
 				;;
 			CR)
 				local button_value=${${(P)${(P)$(echo textbox_buttons_order_key)}[@]}[${(P)$(echo $textbox_buttons_active_key)}]}
@@ -1405,8 +1403,7 @@ _draw_checkboxes() {
 
 		case $input_event[key] in
 			q)
-				# TODO: handle gobally
-				return 1
+				kill -TERM $$
 				;;
 			CR)
 				local button_value=${${(P)${(P)$(echo checkboxes_buttons_order_key)}[@]}[${(P)$(echo $checkboxes_buttons_active_key)}]}
@@ -1671,7 +1668,13 @@ trap '
 # shouldn't return anything, because it is called
 # when the script ends. but we want to be able to 
 # run other schripts after that.
-trap 'trap_cleanup_handler;'    TERM EXIT
+trap 'trap_cleanup_handler;'    EXIT
+trap '
+	trap - EXIT INT TERM ERR ZERR
+	trap_cleanup_handler
+	echo "Received SIGTERM. Aborting script."
+	kill -TERM $$
+' TERM
 trap 'trap_err "$0" "$LINENO";' ZERR ERR
 
 #   _   _
