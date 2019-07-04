@@ -1662,7 +1662,7 @@ trap '
 	trap - EXIT INT TERM ERR ZERR
 	trap_cleanup_handler
 	echo "Received SIGINT. Aborting script."
-	kill -INT -$$
+	kill -INT $$
 ' INT
 
 # shouldn't return anything, because it is called
