@@ -778,13 +778,11 @@ _draw_choices() {
 						function() {
 							setopt LOCAL_OPTIONS #LOCAL_TRAPS #ERR_RETURN
 							unsetopt ERR_EXIT
-							#trap - ERR
 							{
 								_parse_choice_action "${action}"
 
 							} always {
 								retval=$?
-								trap 'trap_cleanup_handler; return $?' ERR
 								setopt ERR_EXIT
 								if catch close_dialog; then
 									TRY_BLOCK_ERROR=0
@@ -805,7 +803,6 @@ _draw_choices() {
 								fi
 							}
 						}
-						#debug_msg "$(trap) $(setopt)"
 						eval "${action_cmd}"
 
 					fi
@@ -1061,6 +1058,7 @@ _draw_textbox() {
 
 				_set_button_function_name "textbox" "$1" "$button_value"
 				if [ "$button_function" != "" ]; then
+					# TODO error handling
 					$button_function && {
 						local retval=$?
 					} || {
@@ -1385,6 +1383,7 @@ _draw_checkboxes() {
 
 				_set_button_function_name "checkboxes" "$1" "$button_value"
 				if [ "$button_function" != "" ]; then
+					# TODO error handling
 					$button_function && {
 						local retval=$?
 					} || {
