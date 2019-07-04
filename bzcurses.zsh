@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
-setopt LOCAL_TRAPS ERR_EXIT
+setopt LOCAL_OPTIONS LOCAL_TRAPS ERR_EXIT
+
 autoload throw catch
 
 # cleanup_commands=()
@@ -9,7 +10,7 @@ debug=${debug:-false}
 # redirect stderr so we can display the errors
 # when the ERR trap is called
 stderr_file=$(mktemp -t bzcurses.stderr.$$.XXXXX)
-exec 2>$stderr_file
+exec 4>&2 2>$stderr_file
 
 #       _       __             _ _
 #    __| | ___ / _| __ _ _   _| | |_
@@ -1620,10 +1621,13 @@ trap_cleanup_handler() {
 
 	test -f $error_log_file && cat $error_log_file
 
+	# close redirected stderr
+	exec 2>&4
+
 	test -f $stderr_file && rm -f $stderr_file
 	test -f $error_log_file && rm -f $error_log_file
 
-	return $?
+	[ $signal -ne 0 ] && return $?
 }
 
 trap '
@@ -1632,8 +1636,8 @@ trap '
 	echo "Received SIGINT. Aborting script."
 	kill -INT -$$
 ' INT
-trap 'trap_cleanup_handler; return $?' TERM EXIT
-trap 'err_trap "$0" "$LINENO";'        ZERR ERR
+trap trap_cleanup_handler       TERM EXIT
+trap 'err_trap "$0" "$LINENO";' ZERR ERR
 
 #   _   _
 #  | |_| |__   ___ _ __ ___   ___

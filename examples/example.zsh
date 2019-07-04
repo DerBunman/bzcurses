@@ -198,21 +198,12 @@ blah_checkboxes_buttons_active=1
 # wrapped in an anonymous function so we don't
 # pollute the rest of the script with our traps and stuff
 function() {
-	setopt LOCAL_OPTIONS
-	
 	# include and initialize bzcurses
 	. "$1"
 
 	# draw the choices window from the main choices
 	_draw_choices main
 
-	# if this trap is not reset the script will exit after this
-	# anonymous funtion ends
-	trap - EXIT
-
-	# cleanup screen
-	zcurses end
-	reset
 } "${0:h}/../bzcurses.zsh"
 
 echo BLAH:  $blah_checkboxes_checked

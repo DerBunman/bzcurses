@@ -36,29 +36,23 @@ dirselect_checkboxes_title="dirselects Menu"
 
 # overwrite default buttons for dirselect checkboxes
 typeset -A dirselect_checkboxes_buttons=(
-	ok   "[SAVE]"
-	exit "[CANCEL]"
+	ok   "SAVE"
+	exit "CANCEL"
 )
 dirselect_checkboxes_buttons_order=( "ok" "exit" )
 dirselect_checkboxes_buttons_active=1
 
 #--- END OF CONFIGURATION ---#
 
-# include and initialize bzcurses
-. ${0:h}/../bzcurses.zsh
+# wrapped in an anonymous function so we don't
+# pollute the rest of the script with our traps and stuff
+function() {
+	# include and initialize bzcurses
+	. "$1"
 
-# draw the coices window from the main choices
-_draw_checkboxes dirselect "Directory Select"
-[ $? -ne 0 ] && {
-	exit 1
-} || {
-	if [ ! -f "$REPLY_FILE" ]; then
-		echo $dirselect_checkboxes_checked >"$REPLY_FILE"
-	elif [ -f "$REPLY_FILE" ]; then
-		echo "ERROR: REPLY_FILE $REPLY_FILE already exists. Aborting." >&2
-		false # trigger the ERR trap
-	else
-		echo $dirselect_checkboxes_checked >&3
-	fi
-	exit 0
-}
+	# draw the choices window from the main choices
+	_draw_checkboxes dirselect "Directory Select"
+
+} "${0:h}/../bzcurses.zsh"
+
+echo "$dirselect_checkboxes_checked"
