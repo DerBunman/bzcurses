@@ -51,11 +51,11 @@ erroneous() {
 main_choices_title="Main Menu"
 
 # main menu intro text (max 4 rows)
-main_choices_intro_text="${$(cat <<EOF
+main_choices_intro_text="$(<<EOF
 Welcome to the main menu of the ${0:t} script.
 Feel free to play around.
 EOF
-)}"
+)"
 
 # main menu choices
 typeset -A main_choices=(
@@ -97,7 +97,7 @@ main_choices_buttons_order=( "ok" "close" "exit" "help" "edit" "broken" )
 main_choices_buttons_active=1
 
 
-main_choices_help_text="$(cat <<'EOF'
+main_choices_help_text="$(<<'EOF'
 Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
  
 Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi. Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
@@ -141,7 +141,9 @@ fasel_checkboxes_checked=( foo1 baz2 bar1 )
 # arrays are ordered we define _checkbox_order as an
 # array containing the keys of _checkboxes.
 # if we use the ${(k)} we will get these in random order.
-fasel_checkbox_order=( ${(k)fasel_checkboxes} )
+# if we use ${(ok)} we get the keys in alphabetic order.
+# more infos: http://zsh.sourceforge.net/Doc/Release/Expansion.html#Parameter-Expansion-Flags
+fasel_checkbox_order=( ${(onk)fasel_checkboxes} )
 
 
 #   _     _       _
@@ -177,13 +179,15 @@ blah_checkboxes_checked=( blah01 )
 blah_checkbox_order=(
 	blah01 blah02 blah03 blah04 blah05 blah06 blah07 blah08 blah09 blah10
 )
+# this can be set to radio or checkbox.
+# defaults to checkbox when undefined.
 blah_checkboxes_behavior="radio"
 
-blah_checkboxes_intro_text=$(cat <<EOF
+blah_checkboxes_intro_text="$(<<EOF
 This is a intro text.
 Not the best intro text, but the one we have here....
 EOF
-)
+)"
 blah_checkboxes_title="blahs Menu"
 
 # overwrite default buttons for blah checkboxes
