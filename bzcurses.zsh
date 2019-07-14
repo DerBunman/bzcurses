@@ -1322,6 +1322,9 @@ _draw_checkboxes() {
 				else
 					zcurses string checkboxes "$row"
 					row=""
+					# zsh 5.4.2 will crash on ubuntu 18.04
+					# when we don't use break and have ERR_RETURN active.
+					break
 				fi
 				(( i = i +1 ))
 			done
