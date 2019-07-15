@@ -1,9 +1,51 @@
 #!/usr/bin/env zsh
 setopt LOCAL_OPTIONS LOCAL_TRAPS ERR_EXIT
 
-autoload throw catch
+autoload is-at-least
+is-at-least 5.9 || {
+	. /etc/os-release
+	cat <<-EOF
 
-# cleanup_commands=()
+	ERROR: Your zsh version is not supported.
+	=========================================
+
+	zsh versions <5.5 are not supported by bzcurses.
+	Most likely >=5.4.2 could be supported in the future.
+	But not at the moment and it is also a low priority,
+	since there are no problems with versions >=5.5.
+
+	This script will now abort.
+	Wait, one thing, before I abort.
+
+	You have other options:
+	-----------------------
+	1) Upgrade your $ID to the next stable release.
+	2) Install zsh and zsh-common from some backports source.
+
+	 2a) My own Ubuntu 18.04 (bionic) source:
+	     https://github.com/DerBunman/bundebs (follow instructions from README)
+	     As of writing this repository only contained zsh and zsh-common,
+	     but there may appear some more packages.
+	     - Linux Mint 19.1 compatible, since they share the same packages
+	       Just add the unchanged deb and deb-src from bionic. Yes, unchanged.
+
+	 2b) Just download and install the .deb files by hand.
+	     Con: No automatic updates when vulnerabilities emerge.
+		 Pro: No automatic updates and no risk I break anything or add packages you don't want.
+	     https://github.com/DerBunman/bundebs/tree/master/pool/main/z/zsh
+
+	 2c) You can get zsh also from homebrew, but I haven't tested it.
+
+	3) Just build it yourself.
+	   It is easy, when you just use the dsc file from Ubuntu 19.04 (disco)
+	   as described here: https://gist.github.com/DerBunman/88f85eb63f0b71f8a5271c2081a3e76b
+
+	4) Fix the bzcurses bugs which occur in versions <5.5
+
+	This script will now abort.
+	EOF
+	exit 1
+}
 
 debug=${debug:-false}
 
