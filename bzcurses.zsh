@@ -121,7 +121,7 @@ choices_buttons=(
 choices_buttons_order=( "ok" "exit" "help" )
 
 choices_buttons_actions.exit() {
-	debug_msg "Exit pressed. throwing exit_dialog."
+	debug_msg "Exit pressed. Running yesno_exit."
 	yesno_exit
 }
 
