@@ -2,7 +2,7 @@
 setopt LOCAL_OPTIONS LOCAL_TRAPS ERR_EXIT
 
 autoload is-at-least
-is-at-least 5.9 || {
+is-at-least 5.5 || {
 	. /etc/os-release
 	cat <<-EOF
 
