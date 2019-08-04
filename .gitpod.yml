@@ -1,0 +1,7 @@
+ports:
+- port: 8001
+image:
+  file: .gitpod.dockerfile
+tasks:
+  - command: python3 -m http.server 8001
+    name: Static Server
