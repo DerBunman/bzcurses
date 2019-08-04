@@ -5,6 +5,3 @@ image:
 tasks:
   - command: python3 -m http.server 8001
     name: Static Server
-vscode:
-  extensions:
-    - vscodevim.vim@1.9.0:EVUf1OBNbtona+/NLbkoXA==
